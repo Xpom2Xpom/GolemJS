@@ -120,10 +120,24 @@
         return strParse(url, sep, pos);
     }
 
-    function urlParseArr(urlArr, pos, sep){
+    function urlParseArr(urlArr, pos, sep) {
         let result = [];
         urlArr.forEach( url => {
             result.push(urlParse(url, pos, sep));
+        });
+        return result;
+    }
+
+    function urlGetParams(url) {
+        let str = url.split('?')[1];
+        if (!str) {
+            return null;
+        }
+        let set = str.split('&');
+        let result = {};
+        set.forEach(v => {
+            let tmp = v.split('=');
+            result[tmp[0]] = tmp[1];
         });
         return result;
     }
@@ -171,6 +185,7 @@
         trimArr: urlTrimArr,
         parse: urlParse,
         parseArr: urlParseArr,
+        getParams: urlGetParams,
         templateFromUrl: templateFromUrl,
         urlsFromUrl: urlsFromUrl,
         urlsFromTemplate: urlsFromTemplate
@@ -181,9 +196,15 @@
     function proxyInit(host = 'localhost', port = '80', q = 'q', isSSL) {
         let con = SimpleProxy.config;
         let protocol = isSSL ? 'https://' : 'http://';
-        con.port = ':' + port + '/?';
+        con.port = ':' + port;
         con.host = protocol + host;
-        con.q = q + '=';
+        con.q = '/?' + q + '=';
+    }
+
+    function proxyCancelInit() {
+        con.port = '';
+        com.host = '';
+        con.q = '';
     }
 
     function proxyGet(url) {
@@ -227,6 +248,15 @@
         return result;
     }
 
+    function proxyFindMany(urlArr, selector, attr) {
+        let result = [];
+        urlArr.forEach( url => {
+            let res = proxyFind(url, selector, attr);
+            result = result.concat(res);
+        });
+        return result;
+    }
+
     function proxyFindBatch(urlTemplate, start, end, selector, attr, aditionalArr) {
         let result = [];
         if ((typeof start === 'number') && (typeof end === 'number')) {
@@ -245,15 +275,6 @@
             let res = proxyFind(url, selector, attr);
             result = result.concat(res);
         }
-    }
-
-    function proxyFindMany(urlArr, selector, attr){
-        let result = [];
-        urlArr.forEach( url => {
-            let res = proxyFind(url, selector, attr);
-            result = result.concat(res);
-        });
-        return result;
     }
 
     // Pager
@@ -464,6 +485,7 @@
             q: ''
         },
         init: proxyInit,
+        cancelInit: proxyCancelInit,
         get: proxyGet,
         getDOM: proxyGetDOM,
         find: proxyFind,
@@ -633,7 +655,7 @@
     // MAIN OBJECT
 
     let GMInfo = {
-        version: '2.0.0.1'
+        version: '2.1.0'
     };
     GL.gm = {
         info: GMInfo,
