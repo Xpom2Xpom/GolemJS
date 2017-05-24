@@ -1,195 +1,173 @@
 'use strict';
 
-(function(GL) {
+(function (GL) {
 
     // StringBuilder
+    class StringBuilder {
 
-    function strTrim(str, sym) {
-        if (typeof sym === 'string') {
+        static trim(str, sym = '(^\s)(\s$)') {
             let re = new RegExp(sym, 'g');
             return str.replace(re, '');
         }
-        let res = str;
-        sym.forEach( val => {
-            let re = new RegExp(val, 'g');
-            res = res.replace(re, '');
-        });
-        return res;
-    }
 
-    function strTrimArr(arr, sym){
-        let result = [];
-        arr.forEach(str => {
-            result.push(strTrim(str, sym));
-        });
-        return result;
-    }
-
-    function strParse(str, sep, pos) {
-        let arr = str.split(sep);
-        let typePos = typeof pos;
-        if (typePos === 'number') {
-            return arr[pos - 1];
+        static trimArr(arr, sym) {
+            let result = [];
+            arr.forEach(str => {
+                result.push(this.trim(str, sym));
+            });
+            return result;
         }
-        let result = [];
-        pos.forEach( i => {
-            result.push(arr[i - 1]);
-        });
-        return result;
-    }
-    
-    function strParseArr(arr, sep, pos) {
-        let result = [];
-        arr.forEach( val => {
-            result.push(strParse(val, sep, pos));
-        });
-        return result;
-    }
 
-    function strBuild(template, value) {
-        let typeValue = typeof value;
-        if((typeValue === 'string') || (typeValue === 'number')) {
-            return template.replace('{1}', value);
-        }
-        value.forEach( (i, n) => {
-            let ii = n + 1;
-            let rep = '{' + ii + '}';
-            template = template.replace(rep, i);
-        });
-        return template;
-    }
-
-    function strBuildArr(template, ...arr) {
-        let tmp = template;
-        let result = [];
-        let arr2 = [];
-        for (let i = 0, len = arr[0].length; i < len; i +=1) {
-            arr2[i] = [];
-        }
-        for (let i = 0, len = arr.length; i < len; i +=1) {
-            for (let j = 0, len2 = arr[i].length; j < len2; j +=1) {
-                arr2[j][i] = arr[i][j];
+        static parse(str, sep = ' ', pos = 1) {
+            let arr = str.split(sep);
+            let typePos = typeof pos;
+            if (typePos === 'number') {
+                return arr[pos - 1];
             }
+            let result = [];
+            pos.forEach(i => {
+                result.push(arr[i - 1]);
+            });
+            return result;
         }
-        arr2.forEach( tarArr => {
-            result.push(strBuild(tmp, tarArr));
-        });
-        return result;
 
+        static parseArr(arr, sep, pos) {
+            let result = [];
+            arr.forEach(val => {
+                result.push(this.parse(val, sep, pos));
+            });
+            return result;
+        }
+
+        static build(template, value = 'Replaced value', sym = '{1}', leftSym = '{', rightSym = '}') {
+            let typeValue = typeof value;
+            if ((typeValue === 'string') || (typeValue === 'number')) {
+                return template.replace(sym, value);
+            }
+            value.forEach((i, n) => {
+                let ii = n + 1;
+                let rep = leftSym + ii + rightSym;
+                template = template.replace(rep, i);
+            });
+            return template;
+        }
+
+        static buildArr(template, ...arr) {
+            let tmp = template;
+            let result = [];
+            arr.forEach(tarArr => {
+                result.push(this.build(tmp, tarArr));
+            });
+            return result;
+        }
+
+        static buildArrStepByStep(template, ...arr) {
+            let tmp = template;
+            let result = [];
+            let arr2 = [];
+            for (let i = 0, len = arr[0].length; i < len; i += 1) {
+                arr2[i] = [];
+            }
+            for (let i = 0, len = arr.length; i < len; i += 1) {
+                for (let j = 0, len2 = arr[i].length; j < len2; j += 1) {
+                    arr2[j][i] = arr[i][j];
+                }
+            }
+            arr2.forEach(tarArr => {
+                result.push(this.build(tmp, tarArr));
+            });
+            return result;
+        }
     }
-
-    function strBuildArrStepByStep(template, ...arr) {
-        let tmp = template;
-        let result = [];
-        arr.forEach( tarArr => {
-            result.push(strBuild(tmp, tarArr));
-        });
-        return result;
-
-    }
-
-    let StringBuilder = {
-        trim: strTrim,
-        trimArr: strTrimArr,
-        parse: strParse,
-        parseArr: strParseArr,
-        build: strBuild,
-        buildArr: strBuildArr,
-        buildArrStep: strBuildArrStepByStep
-    };
 
     // UrlBuilder
+    class UrlBuilder {
 
-    function urlTrim(url) {
-        url = url.replace('http://', '');
-        url = url.replace('https://', '');
-        url = url.split('?')[0];
-        return url;
-    }
-
-    function urlTrimArr(urlArr) {
-        let result = [];
-        urlArr.forEach( url => {
-            result.push(urlTrim(url));
-        });
-        return result;
-    }
-
-    function urlParse(url, pos, sep = '/') {
-        url = urlTrim(url);
-        return strParse(url, sep, pos);
-    }
-
-    function urlParseArr(urlArr, pos, sep) {
-        let result = [];
-        urlArr.forEach( url => {
-            result.push(urlParse(url, pos, sep));
-        });
-        return result;
-    }
-
-    function urlGetParams(url) {
-        let str = url.split('?')[1];
-        if (!str) {
-            return null;
+        static build(template, value, sym, leftSym, rightSym) {
+            StringBuilder.build(template, value, sym, leftSym, rightSym);
         }
-        let set = str.split('&');
-        let result = {};
-        set.forEach(v => {
-            let tmp = v.split('=');
-            result[tmp[0]] = tmp[1];
-        });
-        return result;
-    }
 
-    function templateFromUrl(url, index, ssl) {
-        let typeIndex = typeof index;
-        url = urlTrim(url);
-        let arr = url.split('/');
-        if (typeIndex === 'number') {
-            arr[index - 1] = '{1}';
-        } else {
-            index.forEach( (val, n) => {
-                let ii = n + 1;
-                arr[val - 1] = '{' + ii + '}';
+        static trim(url) {
+            url = url.replace('http://', '');
+            url = url.replace('https://', '');
+            url = url.split('?')[0];
+            return url;
+        }
+
+        static trimArr(urlArr) {
+            let result = [];
+            urlArr.forEach(url => {
+                result.push(this.trim(url));
             });
+            return result;
         }
-        let newUrl = arr.join('/');
-        let protocol = ssl ? 'https://' : 'http://';
-        return protocol + newUrl;
-    }
 
-    function urlsFromUrl(etalon, pos1, urls, pos2) {
-        etalon = urlTrim(etalon);
-        urls = urlTrimArr(urls);
-        let template = templateFromUrl(etalon, pos1);
-        let params = urlParseArr(urls, pos2);
-        let result = [];
-        params.forEach( param => {
-            result.push(strBuild(template, param));
-        });
-        return result;
-    }
+        static parse(url, pos = 1, sep = '/') {
+            url = this.trim(url);
+            return StringBuilder.parse(url, sep, pos);
+        }
 
-    function urlsFromTemplate(template, urls, pos) {
-        let params = urlParseArr(urls, pos);
-        let result = [];
-        params.forEach( param => {
-            result.push(strBuild(template, param));
-        });
-        return result;
-    }
+        static parseArr(urlArr, pos, sep) {
+            let result = [];
+            urlArr.forEach(url => {
+                result.push(this.parse(url, pos, sep));
+            });
+            return result;
+        }
 
-    let UrlBuilder = {
-        trim: urlTrim,
-        trimArr: urlTrimArr,
-        parse: urlParse,
-        parseArr: urlParseArr,
-        getParams: urlGetParams,
-        templateFromUrl: templateFromUrl,
-        urlsFromUrl: urlsFromUrl,
-        urlsFromTemplate: urlsFromTemplate
-    };
+        static getParams(url) {
+            let str = url.split('?')[1];
+            if (!str) {
+                return null;
+            }
+            let set = str.split('&');
+            let result = {};
+            set.forEach(v => {
+                let tmp = v.split('=');
+                result[tmp[0]] = tmp[1];
+            });
+            return result;
+        }
+
+        static templateFromUrl(url, index, sym = '{1}', leftSym = '{', rightSym = '}') {
+            let ssl = url.indexOf('https://') >= 0;
+            let typeIndex = typeof index;
+            url = this.trim(url);
+            let arr = url.split('/');
+            if (typeIndex === 'number') {
+                arr[index - 1] = sym;
+            } else {
+                index.forEach((val, n) => {
+                    let ii = n + 1;
+                    arr[val - 1] = leftSym + ii + rightSym;
+                });
+            }
+            let newUrl = arr.join('/');
+            let protocol = ssl ? 'https://' : 'http://';
+            return protocol + newUrl;
+        }
+
+        static urlsFromUrl(etalon, pos1, urls, pos2) {
+            etalon = this.trim(etalon);
+            urls = this.trimArr(urls);
+            let template = this.templateFromUrl(etalon, pos1);
+            let params = this.parseArr(urls, pos2);
+            let result = [];
+            params.forEach(param => {
+                result.push(StringBuilder.build(template, param));
+            });
+            return result;
+        }
+
+        static urlsFromTemplate(template, urls, pos) {
+            let params = this.parseArr(urls, pos);
+            let result = [];
+            params.forEach(param => {
+                result.push(this.build(template, param));
+            });
+            return result;
+        }
+    }
 
     // SimpleProxy
 
@@ -250,7 +228,7 @@
 
     function proxyFindMany(urlArr, selector, attr) {
         let result = [];
-        urlArr.forEach( url => {
+        urlArr.forEach(url => {
             let res = proxyFind(url, selector, attr);
             result = result.concat(res);
         });
@@ -265,12 +243,12 @@
             }
         }
         if (aditionalArr) {
-            aditionalArr.forEach( i => {
+            aditionalArr.forEach(i => {
                 getPeace(i);
             });
         }
         return result;
-        function getPeace(i){
+        function getPeace(i) {
             let url = strBuild(urlTemplate, i);
             let res = proxyFind(url, selector, attr);
             result = result.concat(res);
@@ -320,7 +298,7 @@
                 this.pagesLoaded = this.pagesSize;
             }
             this.pagesLeft -= n;
-            if (this.pagesLeft <=  0) {
+            if (this.pagesLeft <= 0) {
                 this.pagesLeft = 0;
                 this.isExistsNext = false;
             }
@@ -357,14 +335,14 @@
 
         next(n = 1) {
             if (!this.isExistsNext) {
-            return [];
+                return [];
             }
             let loops = [0, goLoop1, goLoop2, goLoop3];
             let res = loops[this._loopType]();
             this.result = this.result.concat(res);
             return res;
             //
-            function goLoop1(){
+            function goLoop1() {
                 if (this._isFirstLoop) {
                     this._isFirstLoop = false;
                     this._indS = this.start;
@@ -496,7 +474,7 @@
 
     // LoadScreen
 
-    let LoadScreen = (function(){
+    let LoadScreen = (function () {
         let screenId = null;
         let config = {
             id: 'xp_loadScreen'
@@ -510,12 +488,12 @@
             backgroundColor: 'blue'
         };
         let userStyles = null;
-        function changeId(id){
+        function changeId(id) {
             if (id && (typeof id === 'string')) {
                 config.id = id;
             }
         }
-        function setStyles(el){
+        function setStyles(el) {
             for (let v in styles) {
                 el.style[v] = styles[v];
             }
@@ -528,7 +506,7 @@
         function setStylesUser(conf) {
             userStyles = conf;
         }
-        function show(message){
+        function show(message) {
             if (screenId === null) {
                 screenId = config.id;
                 let el = document.createElement('div');
@@ -561,7 +539,7 @@
         function statistics(arr) {
             let len = arr.length;
             let o = {};
-            arr.forEach( (val, i) => {
+            arr.forEach((val, i) => {
                 if (!o[val]) {
                     o[val] = 0;
                     for (let j = i; j < len; j += 1) {
@@ -578,7 +556,7 @@
                 newArr.push({
                     value: i,
                     repeat: o[i],
-                    percent: (o[i]/len*100).toFixed(2)
+                    percent: (o[i] / len * 100).toFixed(2)
                 });
             }
             newArr.sort(function (a, b) {
@@ -596,7 +574,7 @@
                     this.max = result[0];
                     this.min = result[result.length - 1];
                 }
-                
+
                 getMax(n) {
                     if (!n) {
                         return this.max;
@@ -632,7 +610,7 @@
                 asString(sep1 = ', ', sep2 = ' - ') {
                     let res = '';
                     let len = this.result.length;
-                    this.result.forEach( (val, ii) => {
+                    this.result.forEach((val, ii) => {
                         res += '"' + val.value + '"' + sep2 + val.repeat + sep2 + val.percent + '%';
                         if (ii < len - 1) {
                             res += sep1;
