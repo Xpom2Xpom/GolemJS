@@ -1,25 +1,11 @@
 'use strict';
 
-(function (GL) {
-
-    // MAIN OBJECT
-    const version = '3.0.0';
-    GL.golem = {
-        version: version,
-        StringBuilder: StringBuilder,
-        UrlBuilder: UrlBuilder,
-        Proxy: Proxy,
-        Spliter: Spliter,
-        Pager: Pager,
-        Analytics: Analytics,
-        init: i => GL[i] = GL.golem
-    };
-
+(function(GL) {
 
     // StringBuilder
     class StringBuilder {
 
-        static trim(str, sym = '(^\s)(\s$)') {
+        static trim(str, sym) {
             let re = new RegExp(sym, 'g');
             return str.replace(re, '');
         }
@@ -206,12 +192,50 @@
     }
     Proxy.isUsed = false;
 
+    // private Fragmenter
+    class Fragmenter {
+
+        static getDocumentFragment(txt) {
+            //txt = txt.replace(/src=/g, 'asrc=');
+            txt = this.setAttrsInFragment(txt);
+            txt = this.getBody(txt);
+            let df = GL.document.createElement('div');
+            df.innerHTML = txt;
+            return df;
+        }
+
+        static getBody(txt) {
+            txt = txt.split('<body')[1];
+            txt = txt.replace('</body>', '');
+            return txt;
+        }
+
+        static setAttrsInFragment(txt) {
+            const attrs = this.attrs;
+            attrs.forEach(a => {
+                txt = this.setAttrInFragment(txt, a);
+            });
+            return txt;
+        }
+
+        static setAttrInFragment(txt, attr) {
+            let re = new RegExp(attr + '=', 'g');
+            let sym = 'a' + attr + '=';
+            txt = txt.replace(re, sym);
+            return txt;
+        }
+
+        static getAttrFromFragment(attr) {
+
+        }
+    }
+    Fragmenter.attr = ['src'];
     // Spliter
     class Spliter {
 
         static get(url) {
             url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
-            let x = new XMLHttpRequest();
+            let x = new GL.XMLHttpRequest();
             x.open('GET', url, false);
             x.send(null);
             return x.responseText;
@@ -221,12 +245,8 @@
             if (this.cache[url]) {
                 return this.cache[url];
             }
-            let res = this.get(url);
-            res = res.replace(/src=/g, 'asrc=');
-            res = res.split('<body')[1];
-            res = res.replace('</body>', '');
-            let df = GL.document.createElement('div');
-            df.innerHTML = res;
+            let txt = this.get(url);
+            let df = Fragmenter.getDocumentFragment(txt);
             this.cashe[url] = df;
             return df;
         }
@@ -267,6 +287,7 @@
                 });
             }
             return result;
+
             function getPeace(i) {
                 let url = StringBuilder.build(urlTemplate, i);
                 let res = this.find(url, selector, attr);
@@ -275,6 +296,17 @@
         }
     }
     Spliter.cache = {};
+
+    // SpliterAsin
+    class SpliterAsin {
+        static get(url) {
+            return GL.fetch(url).then(r => r.text());
+        }
+        static getJSON(url) {
+            return GL.fetch(url).then(r => r.json());
+        }
+    }
+    SpliterAsin.cache = {};
 
     // Pager
     class Pager {
@@ -377,6 +409,7 @@
                 this.pagesLeft = this.pagesSize - this.pagesLoaded;
                 return res;
             }
+
             function goLoop2() {
                 if (this._isFirstLoop) {
                     this._isFirstLoop = false;
@@ -405,6 +438,7 @@
                 this.pagesLeft = this.pagesSize - this.pagesLoaded;
                 return res;
             }
+
             function goLoop3() {
                 if (this._isFirstLoop) {
                     this._isFirstLoop = false;
@@ -470,7 +504,7 @@
     };
 
     // LoadScreen
-    let LoadScreen = (function () {
+    let LoadScreen = (function() {
         let screenId = null;
         let config = {
             id: 'xp_loadScreen'
@@ -484,11 +518,13 @@
             backgroundColor: 'blue'
         };
         let userStyles = null;
+
         function changeId(id) {
             if (id && (typeof id === 'string')) {
                 config.id = id;
             }
         }
+
         function setStyles(el) {
             for (let v in styles) {
                 el.style[v] = styles[v];
@@ -499,9 +535,11 @@
                 }
             }
         }
+
         function setStylesUser(conf) {
             userStyles = conf;
         }
+
         function show(message) {
             if (screenId === null) {
                 screenId = config.id;
@@ -516,6 +554,7 @@
             el.innerHTML = message;
             el.style.display = 'block';
         }
+
         function hide() {
             let el = GL.document.getElementById(screenId);
             el.style.display = 'none';
@@ -531,57 +570,57 @@
     // Analitics
     class Aset {
         constructor(target, result) {
-                this.lengthTarget = target.length;
-                this.lengthResult = result.length;
-                this.target = target;
-                this.result = result;
-                this.max = result[0];
-                this.min = result[result.length - 1];
-            }
+            this.lengthTarget = target.length;
+            this.lengthResult = result.length;
+            this.target = target;
+            this.result = result;
+            this.max = result[0];
+            this.min = result[result.length - 1];
+        }
 
-            getMax(n) {
-                if (!n) {
-                    return this.max;
-                }
-                if (n > this.lengthResult - 1) {
-                    n = this.lengthResult;
-                }
-                let res = [];
-                for (let i = 0, len = n; i < len; i += 1) {
-                    res[i] = this.result[i];
-                }
-                return res;
+        getMax(n) {
+            if (!n) {
+                return this.max;
             }
+            if (n > this.lengthResult - 1) {
+                n = this.lengthResult;
+            }
+            let res = [];
+            for (let i = 0, len = n; i < len; i += 1) {
+                res[i] = this.result[i];
+            }
+            return res;
+        }
 
-            getMin(n) {
-                if (!n) {
-                    return this.min;
-                }
-                if (n > this.lengthResult) {
-                    n = this.lengthResult;
-                }
-                let res = [];
-                for (let i = this.lengthResult - 1, len = this.lengthResult - n; i >= len; i -= 1) {
-                    res.push(this.result[i]);
-                }
-                return res;
+        getMin(n) {
+            if (!n) {
+                return this.min;
             }
+            if (n > this.lengthResult) {
+                n = this.lengthResult;
+            }
+            let res = [];
+            for (let i = this.lengthResult - 1, len = this.lengthResult - n; i >= len; i -= 1) {
+                res.push(this.result[i]);
+            }
+            return res;
+        }
 
-            getMinAsString(n = 1, sep1, sep2) {
-                return this.asString(sep1, sep2, this.getMax(n));
-            }
+        getMinAsString(n = 1, sep1, sep2) {
+            return this.asString(sep1, sep2, this.getMax(n));
+        }
 
-            asString(sep1 = ', ', sep2 = ' - ') {
-                let res = '';
-                let len = this.result.length;
-                this.result.forEach((val, ii) => {
-                    res += '"' + val.value + '"' + sep2 + val.repeat + sep2 + val.percent + '%';
-                    if (ii < len - 1) {
-                        res += sep1;
-                    }
-                });
-                return res;
-            }
+        asString(sep1 = ', ', sep2 = ' - ') {
+            let res = '';
+            let len = this.result.length;
+            this.result.forEach((val, ii) => {
+                res += '"' + val.value + '"' + sep2 + val.repeat + sep2 + val.percent + '%';
+                if (ii < len - 1) {
+                    res += sep1;
+                }
+            });
+            return res;
+        }
     }
 
     class Analytics {
@@ -609,7 +648,7 @@
                     percent: (o[i] / len * 100).toFixed(2)
                 });
             }
-            newArr.sort(function (a, b) {
+            newArr.sort(function(a, b) {
                 return b.repeat - a.repeat;
             });
 
@@ -618,4 +657,17 @@
         }
     }
 
+    // MAIN OBJECT
+    const version = '3.0.0';
+    GL.golem = {
+        version: version,
+        StringBuilder: StringBuilder,
+        UrlBuilder: UrlBuilder,
+        Proxy: Proxy,
+        Spliter: Spliter,
+        SpliterAsin: SpliterAsin,
+        Pager: Pager,
+        Analytics: Analytics,
+        init: i => GL[i] = GL.golem
+    };
 })(window);
