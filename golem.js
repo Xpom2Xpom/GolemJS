@@ -196,7 +196,6 @@
     class Fragmenter {
 
         static getDocumentFragment(txt) {
-            //txt = txt.replace(/src=/g, 'asrc=');
             txt = this.setAttrsInFragment(txt);
             txt = this.getBody(txt);
             let df = GL.document.createElement('div');
@@ -220,16 +219,26 @@
 
         static setAttrInFragment(txt, attr) {
             let re = new RegExp(attr + '=', 'g');
-            let sym = 'a' + attr + '=';
+            let sym = this.sym + attr + '=';
             txt = txt.replace(re, sym);
             return txt;
         }
 
         static getAttrFromFragment(attr) {
-
+            let sym;
+            this.attrs.forEach(a => {
+                if (attr === a) {
+                    sym = a;
+                }
+            });
+            if (sym) {
+                return this.sym + attr;
+            }
+            return attr;
         }
     }
-    Fragmenter.attr = ['src'];
+    Fragmenter.sym = 'a';
+    Fragmenter.attrs = ['src'];
     // Spliter
     class Spliter {
 
@@ -247,7 +256,7 @@
             }
             let txt = this.get(url);
             let df = Fragmenter.getDocumentFragment(txt);
-            this.cashe[url] = df;
+            this.cache[url] = df;
             return df;
         }
 
@@ -257,7 +266,7 @@
             if (!attr) {
                 return els;
             }
-            attr = (attr === 'src') ? 'asrc' : attr;
+            attr = Fragmenter.getAttrFromFragment(attr);
             let result = [];
             for (let i = 0, len = els.length; i < len; i += 1) {
                 result.push(els[i].getAttribute(attr));
@@ -278,32 +287,107 @@
             let result = [];
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
-                    getPeace(i);
+                    let url = StringBuilder.build(urlTemplate, i);
+                    let res = this.find(url, selector, attr);
+                    result = result.concat(res);
                 }
             }
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
-                    getPeace(i);
+                    let url = StringBuilder.build(urlTemplate, i);
+                    let res = this.find(url, selector, attr);
+                    result = result.concat(res);
                 });
             }
             return result;
-
-            function getPeace(i) {
-                let url = StringBuilder.build(urlTemplate, i);
-                let res = this.find(url, selector, attr);
-                result = result.concat(res);
-            }
         }
     }
     Spliter.cache = {};
 
     // SpliterAsin
     class SpliterAsin {
+
         static get(url) {
+            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.text());
         }
+
         static getJSON(url) {
+            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.json());
+        }
+
+        static getDOM(url) {
+            return new GL.Promise((res, rej) => {
+                if (this.cache[url]) {
+                    res(this.cache[url]);
+                } else {
+                    this.get(url).then(txt => {
+                        let df = Fragmenter.getDocumentFragment(txt);
+                        this.cache[url] = df;
+                        res(df);
+                    });
+                }
+            });
+        }
+
+        static find(url, selector, attr) {
+            return new GL.Promise((res, rej) => {
+                this.getDOM(url).then(df => {
+                    let els = df.querySelectorAll(selector);
+                    if (!attr) {
+                        res(els);
+                    } else {
+                        attr = Fragmenter.getAttrFromFragment(attr);
+                        let result = [];
+                        for (let i = 0, len = els.length; i < len; i += 1) {
+                            result.push(els[i].getAttribute(attr));
+                        }
+                        res(result);
+                    }
+                });
+            });
+        }
+
+        static findArr(urlArr, selector, attr) {
+            return new GL.Promise((res, rej) => {
+                let pr = [];
+                let result = [];
+                urlArr.forEach(url => {
+                    pr.push(this.find(url, selector, attr));
+                });
+                GL.Promise.all(pr).then(data => {
+                    data.forEach(d => {
+                        result = result.concat(d);
+                    });
+                    res(result);
+                });
+            });
+        }
+
+        static findBatch(urlTemplate, start, end, selector, attr, aditionalArr) {
+            return new GL.Promise((res, rej) => {
+                let pr = [];
+                let result = [];
+                if ((typeof start === 'number') && (typeof end === 'number')) {
+                    for (let i = start; i <= end; i += 1) {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.find(url, selector, attr));
+                    }
+                }
+                if (aditionalArr) {
+                    aditionalArr.forEach(i => {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.find(url, selector, attr));
+                    });
+                }
+                GL.Promise.all(pr).then(data => {
+                    data.forEach(d => {
+                        result = result.concat(d);
+                    });
+                    res(result);
+                });
+            });
         }
     }
     SpliterAsin.cache = {};
