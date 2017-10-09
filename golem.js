@@ -249,7 +249,11 @@
                     list[o] = els;
                 } else {
                     for (let i = 0, len = els.length; i < len; i += 1) {
-                        list[o].push(els[i].getAttribute(attr));
+                        if (attr === 'innerText' || attr === 'innerHTML') {
+                            list[o].push(els[i][attr]);
+                        } else {
+                            list[o].push(els[i].getAttribute(attr));
+                        }
                     }
                 }
             }
