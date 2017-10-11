@@ -1,0 +1,6 @@
+{
+"name": "golemjs",
+"description": "es6 library to get data from static pages"
+"authors": ["Xpom2Xpom"],
+"keywords": ["golem", "golemjs", "get static data"]
+}
