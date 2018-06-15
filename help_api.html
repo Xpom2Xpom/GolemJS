@@ -1,0 +1,43 @@
+<h1>overview golem API</h1>
+
+<h2>Utils:</h2>
+
+<h3>golem.utils.StringBuilder</h3>
+
+<h4>remove(str: string, sym: string) => string</h4>
+Remove all symbols sym from string str.<br>
+golem.utils.StringBuilder.remove('abcb', 'b') => 'ac'<br>
+
+<h4>removeArr(arr: array[string], sym: string) => array[string]</h4>
+Remove all symbols sym from all string of array arr.<br>
+golem.utils.StringBuilder.removeArr(['abc1', '11a'], '1') => ['abc', 'a']<br>
+
+<h4>parse(str: string, sep: string, pos: number) => string</h4>
+Get some parth of string str splited by separator sep on position pos<br>
+golem.utils.StringBuilder.parse('aaa.bbb.ccc', '.', 1) => 'aaa'<br>
+
+<h4>parse(str: string, sep: string, pos: array[number]) => array[string]</h4>
+Get some array of strings for string str splited by separator sep on positions pos<br>
+golem.utils.StringBuilder.parse('aaa.bbb.ccc', '.', [2, 3]) => ['bbb', 'ccc']<br>
+
+<h4>parseArr(arr: array[string], sep: string, pos: number) => array[string]</h4>
+The same as parse but for array of strings<br>
+golem.utils.StringBuilder.parseArr(['aaa.bbb', 'ccc.ddd'], '.', 2) => ['bbb', 'ddd']<br>
+
+<h4>build(template: string, value: string) => string</h4>
+Replase sym (default {1}) in template by value <br>
+golem.utils.StringBuilder.build('aaa {1} bbb', 'sss') => 'aaa sss bbb'<br>
+
+<h4>build(template: string, value: string, value2: string) => string</h4>
+Replase sym {1} and sym2 {2} - and anothers {1} - {n} - in template by values <br>
+golem.utils.StringBuilder.build('aaa {1} {2} bbb', 'sss', 'ddd') => 'aaa sss ddd bbb'<br>
+golem.utils.StringBuilder.build('aaa {1} {2} {3} bbb', '111', '222', '333') => 'aaa 111 222 333 bbb'<br>
+
+<h4>buildArr(template: string, value: string, value2: string, ...) => string</h4>
+The same as build but for array of templates<br>
+golem.utils.StringBuilder.buildArr(['aaa {1} bbb', 'ccc {1} ddd'], 'sss', 'fff') => ['aaa sss bbb', 'ccc fff ddd']<br>
+golem.utils.StringBuilder.buildArr(['aaa {1} {2} bbb', 'ccc {1} {2} ddd'], ['111', '222'], ['333', '444']) => ['aaa 111 222 bbb', 'ccc 333 444 ddd']<br>
+
+<h4>buildArrStepByStep(template: string, value: array[string], value2: array[string], ...) => array[string]</h4>
+Return array of strings building from templates using for each element from each array - for {1} first element from all arrays, for {2} - second ...<br>
+golem.utils.StringBuilder.buildArrStepByStep('aaa {1} {2} {3}', [1,2,3], [4,5,6], [7,8,9]) => ["aaa 1 4 7", "aaa 2 5 8", "aaa 3 6 9"]<br>

@@ -55,8 +55,8 @@
         static buildArr(template, ...arr) {
             let tmp = template;
             let result = [];
-            arr.forEach(tarArr => {
-                result.push(this.build(tmp, tarArr));
+            arr.forEach((tarArr, index) => {
+                result.push(this.build(tmp[index], tarArr));
             });
             return result;
         }
