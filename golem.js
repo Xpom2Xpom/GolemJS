@@ -234,11 +234,44 @@
             return result;
         }
 
+        /*
+        obj = {
+            ?parentSelector: 'CSS PARENT SELECTOR',
+            name1: {
+                selector: '<CSS SELECTOR>',
+                attr: 'ELEMENT ATTRIBUTE'
+            },
+            name2: {
+                selector: '<CSS SELECTOR>',
+                attr: 'ELEMENT ATTRIBUTE'
+            },
+            ...
+        }
+        return [{name1,name2}, {name1,name2},...]
+        */
         static findBatch(url, obj) {
             let df = this.getDOM(url);
             let list = {};
             let result = [];
             let lenAll = 0;
+            if (obj.parentSelector) {
+                let ps = obj.parentSelector;
+                delete obj.parentSelector;
+                let parentEls = df.querySelectorAll(ps);
+                for (let i = 0, len = parentEls.length; i < len; i += 1) {
+                    let newObj = {};
+                    for (let o in obj) {
+                        let sel = obj[o].selector;
+                        let attr = obj[o].attr;
+                        let pEl = parentEls[i];
+                        let propEl = pEl.querySelector(sel);
+                        let prop = propEl[attr];
+                        newObj[o] = prop;
+                    }
+                    result.push(newObj);
+                }
+                return result;
+            }
             for (let o in obj) {
                 list[o] = [];
                 let sel = obj[o].selector;
@@ -248,7 +281,7 @@
                 if (!attr) {
                     list[o] = els;
                 } else {
-                    for (let i = 0, len = els.length; i < len; i += 1) {
+                    for (let i = 0; i < lenAll; i += 1) {
                         list[o].push(els[i][attr]);
                     }
                 }
@@ -263,7 +296,7 @@
             return result;
         }
 
-        static findArr(urlArr, selector, attr, isBatch = false) {
+        static findArr(urlArr, selector, attr) {
             let result = [];
             urlArr.forEach(url => {
                 let res = this.find(url, selector, attr);
@@ -283,6 +316,8 @@
 
         static findRange(urlTemplate, start, end, selector, attr, aditionalArr) {
             let result = [];
+            start = Number.parseInt(start);
+            end = Number.parseInt(end);
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
@@ -300,6 +335,7 @@
             return result;
         }
 
+        // config = {from: int, to: int, ?more: [string]}
         static findRangeBatch(urlTemplate, config, obj) {
             let result = [];
             let start = config.from;
@@ -369,11 +405,53 @@
                     } else {
                         let result = [];
                         for (let i = 0, len = els.length; i < len; i += 1) {
-                            result.push(els[i].getAttribute(attr));
+                            result.push(els[i][attr]);
                         }
                         res(result);
                     }
                 });
+            });
+        }
+
+        /*
+        obj = {
+            ?parentSelector: 'CSS PARENT SELECTOR',
+            name1: {
+                selector: '<CSS SELECTOR>',
+                attr: 'ELEMENT ATTRIBUTE'
+            },
+            name2: {
+                selector: '<CSS SELECTOR>',
+                attr: 'ELEMENT ATTRIBUTE'
+            },
+            ...
+        }
+        return [{name1,name2}, {name1,name2},...]
+        */
+        static findBatch(url, obj) {
+            return new GL.Promise((res, rej) => {
+                let result = [];
+                if (!obj.parentSelector) {
+                    rej({message: 'does not exists parentSelector'});
+                }
+                this.getDOM(url).then((df) => {
+                    let ps = obj.parentSelector;
+                    delete obj.parentSelector;
+                    let parentEls = df.querySelectorAll(ps);
+                    for (let i = 0, len = parentEls.length; i < len; i += 1) {
+                        let newObj = {};
+                        for (let o in obj) {
+                            let sel = obj[o].selector;
+                            let attr = obj[o].attr;
+                            let pEl = parentEls[i];
+                            let propEl = pEl.querySelector(sel);
+                            let prop = propEl[attr];
+                            newObj[o] = prop;
+                        }
+                        result.push(newObj);
+                    }
+                });
+                res(result);
             });
         }
 
@@ -393,22 +471,13 @@
             });
         }
 
-        static findBatch(urlTemplate, start, end, selector, attr, aditionalArr) {
+        static findArrBatch(urlArr, obj) {
             return new GL.Promise((res, rej) => {
                 let pr = [];
                 let result = [];
-                if ((typeof start === 'number') && (typeof end === 'number')) {
-                    for (let i = start; i <= end; i += 1) {
-                        let url = StringBuilder.build(urlTemplate, i);
-                        pr.push(this.find(url, selector, attr));
-                    }
-                }
-                if (aditionalArr) {
-                    aditionalArr.forEach(i => {
-                        let url = StringBuilder.build(urlTemplate, i);
-                        pr.push(this.find(url, selector, attr));
-                    });
-                }
+                urlArr.forEach(url => {
+                    pr.push(this.findBatch(url, obj));
+                });
                 GL.Promise.all(pr).then(data => {
                     data.forEach(d => {
                         result = result.concat(d);
@@ -512,7 +581,7 @@
     }
 
     // MAIN OBJECT
-    const version = '3.0.0';
+    const version = '0.1.3';
     GL.golem = {
         version: version,
         utils: {
@@ -522,7 +591,6 @@
         },
         Proxy: Proxy,
         Spliter: Spliter,
-        //SpliterAsin: SpliterAsin,
         init: i => GL[i] = GL.golem
     };
 })(window);
