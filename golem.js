@@ -591,6 +591,7 @@
         },
         Proxy: Proxy,
         Spliter: Spliter,
+        SpliterAsyn: SpliterAsin,
         init: i => GL[i] = GL.golem
     };
 })(window);
