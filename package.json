@@ -1,0 +1,26 @@
+{
+  "name": "golemjs",
+  "version": "0.0.2",
+  "description": "es6 lib to get data from static pages",
+  "main": "golem.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xpom2xpom/golemjs.git"
+  },
+  "keywords": [
+    "golem",
+    "golemjs",
+    "get",
+    "static",
+    "data"
+  ],
+  "author": "xpom2xpom",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xpom2xpom/golemjs/issues"
+  },
+  "homepage": "https://github.com/xpom2xpom/golemjs#readme"
+}
