@@ -490,6 +490,28 @@
     SpliterAsin.cache = {};
     SpliterAsin.parser = new DOMParser();
 
+    // localStorage
+    class Storage {
+
+        static set(storageName, obj) {
+            let storageObj = JSON.stringify(obj);
+            GL.localStorage.setItem(storageName, storageObj);
+        }
+
+        static get(storageName) {
+            let obj = GL.localStorage.getItem(storageName);
+            return JSON.parse(obj);
+        }
+
+        static remove(storageName) {
+            GL.localStorage.removeItem(storageName);
+        }
+
+        static clear() {
+            GL.localStorage.clear();
+        }
+    }
+
     // Analitics
     class Aset {
         constructor(target, result) {
@@ -581,7 +603,7 @@
     }
 
     // MAIN OBJECT
-    const version = '0.1.3';
+    const version = '0.1.4';
     GL.golem = {
         version: version,
         utils: {
@@ -592,6 +614,7 @@
         Proxy: Proxy,
         Spliter: Spliter,
         SpliterAsyn: SpliterAsin,
+        Storage: Storage,
         init: i => GL[i] = GL.golem
     };
 })(window);
