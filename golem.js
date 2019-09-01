@@ -250,11 +250,11 @@
         return [{name1,name2}, {name1,name2},...]
         */
         static findBatch(url, obj, parentSel) {
+            let result = [];
             let df = this.getDOM(url);
             let ps = obj._parentSelector || obj._ps || parentSel;
             delete obj._parentSelector;
             delete obj._ps;
-            let result = [];
 
             if (!ps) {
                 handleSyntaxError('has not "_parentSelector" entity in config');
@@ -270,9 +270,7 @@
                     let attr;
                     if (typeP === 'string') {
                         let arrP = obj[o].split(' ');
-                        let lenP = arrP.length;
-                        attr = arrP[lenP - 1];
-                        arrP.pop();
+                        attr = arrP.pop();
                         sel = arrP.join(' ');
                     } else {
                         sel = obj[o].selector;
@@ -335,6 +333,7 @@
             let end = config.to;
             let aditionalArr = config.more;
             let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
+
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
@@ -342,6 +341,7 @@
                     result = result.concat(res);
                 }
             }
+
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
                     let url = StringBuilder.build(urlTemplate, i);
@@ -349,6 +349,7 @@
                     result = result.concat(res);
                 });
             }
+
             return result;
         }
     }
@@ -409,7 +410,7 @@
 
         /*
         obj = {
-            ?parentSelector: 'CSS PARENT SELECTOR',
+            ?_parentSelector: 'CSS PARENT SELECTOR',
             name1: {
                 selector: '<CSS SELECTOR>',
                 attr: 'ELEMENT ATTRIBUTE'
@@ -422,30 +423,43 @@
         }
         return [{name1,name2}, {name1,name2},...]
         */
-        static findBatch(url, obj) {
+        static findBatch(url, obj, parentSel) {
             return new GL.Promise((res, rej) => {
                 let result = [];
-                if (!obj.parentSelector) {
+                let ps = obj._parentSelector || obj._ps || parentSel;
+                delete obj._parentSelector;
+                delete obj._ps;
+
+                if (!ps) {
                     rej({message: 'does not exists parentSelector'});
                 }
+
                 this.getDOM(url).then((df) => {
-                    let ps = obj.parentSelector;
-                    delete obj.parentSelector;
                     let parentEls = df.querySelectorAll(ps);
                     for (let i = 0, len = parentEls.length; i < len; i += 1) {
                         let newObj = {};
                         for (let o in obj) {
-                            let sel = obj[o].selector;
-                            let attr = obj[o].attr;
+                            let typeP = typeof obj[o];
+                            let sel;
+                            let attr;
+                            if (typeP === 'string') {
+                                let arrP = obj[o].split(' ');
+                                attr = arrP.pop();
+                                sel = arrP.join(' ');
+                            } else {
+                                sel = obj[o].selector;
+                                attr = obj[o].attr;
+                            }
                             let pEl = parentEls[i];
-                            let propEl = pEl.querySelector(sel);
+                            let propEl = sel ? pEl.querySelector(sel) : pEl;
                             let prop = propEl[attr];
                             newObj[o] = prop;
                         }
                         result.push(newObj);
                     }
+
+                    res(result);
                 });
-                res(result);
             });
         }
 
@@ -469,9 +483,43 @@
             return new GL.Promise((res, rej) => {
                 let pr = [];
                 let result = [];
+                let ps = obj._parentSelector || obj._ps;
                 urlArr.forEach(url => {
-                    pr.push(this.findBatch(url, obj));
+                    pr.push(this.findBatch(url, obj, ps));
                 });
+                GL.Promise.all(pr).then(data => {
+                    data.forEach(d => {
+                        result = result.concat(d);
+                    });
+                    res(result);
+                });
+            });
+        }
+
+        // config = {from: int, to: int, ?more: [string]}
+        static findRangeBatch(urlTemplate, config, obj) {
+            return new GL.Promise((res, rej) => {
+                let pr = [];
+                let result = [];
+                let start = config.from;
+                let end = config.to;
+                let aditionalArr = config.more;
+                let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
+
+                if ((typeof start === 'number') && (typeof end === 'number')) {
+                    for (let i = start; i <= end; i += 1) {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.findBatch(url, obj, ps));
+                    }
+                }
+
+                if (aditionalArr) {
+                    aditionalArr.forEach(i => {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.findBatch(url, obj, ps));
+                    });
+                }
+
                 GL.Promise.all(pr).then(data => {
                     data.forEach(d => {
                         result = result.concat(d);
@@ -597,15 +645,15 @@
     }
 
     // Error handlers
-    function handleSyntaxError(message){
+    function handleSyntaxError(message) {
         throw new SyntaxError(message);
     }
 
     // Global aliases
-    function findAs(){
+    function findAs() {
         let len = arguments.length;
 
-        if (len === 1){
+        if (len === 1) {
             let arg = arguments[0];
             let url = arg._url;
             let config = {
@@ -615,16 +663,16 @@
                 ps: arg._parentSelector || arg._ps
             };
 
-            if (!url){
+            if (!url) {
                 handleSyntaxError('has not url for finding');
             }
-            if (!config.from){
+            if (!config.from) {
                 handleSyntaxError('has not "from" entry point');
             }
-            if (!config.to){
+            if (!config.to) {
                 handleSyntaxError('has not "to" end point');
             }
-            if (!config.ps){
+            if (!config.ps) {
                 handleSyntaxError('has not "_parentSelector" entity in config');
             }
 
@@ -639,12 +687,12 @@
             return res;
         }
 
-        if (len === 2){
+        if (len === 2) {
             let url = arguments[0];
             let obj = arguments[1];
             let type = typeof url;
 
-            if (type === 'string'){
+            if (type === 'string') {
                 let res = Spliter.findBatch(url, obj);
                 return res;
             }
@@ -653,13 +701,13 @@
             return res;
         }
 
-        if (len === 3){
+        if (len === 3) {
             let url = arguments[0];
             let selector = arguments[1];
             let attr = arguments[2];
             let type = typeof url;
 
-            if (type === 'string'){
+            if (type === 'string') {
                 let res = Spliter.find(url, selector, attr);
                 return res;
             }
@@ -669,6 +717,77 @@
         }
 
         handleSyntaxError('Arguments should be from 1 to 3');
+    };
+
+    function findAsAsyn() {
+        return new GL.Promise((res, rej) => {
+            let len = arguments.length;
+
+            if (len === 1) {
+                let arg = arguments[0];
+                let url = arg._url;
+                let config = {
+                    from: arg._from,
+                    to: arg._to,
+                    more: arg._more,
+                    ps: arg._parentSelector || arg._ps
+                };
+
+                if (!url) {
+                    rej('has not url for finding');
+                }
+                if (!config.from) {
+                    rej('has not "from" entry point');
+                }
+                if (!config.to) {
+                    rej('has not "to" end point');
+                }
+                if (!config.ps) {
+                    rej('has not "_parentSelector" entity in config');
+                }
+
+                delete arg._url;
+                delete arg._from;
+                delete arg._to;
+                delete arg._more;
+                delete arg._ps;
+                delete arg._parentSelector;
+
+                SpliterAsyn.findRangeBatch(url, config, arg).then(els => res(els));
+                return;
+            }
+
+            if (len === 2) {
+                let url = arguments[0];
+                let obj = arguments[1];
+                let type = typeof url;
+
+                if (type === 'string') {
+                    SpliterAsyn.findBatch(url, obj).then(els => res(els));
+                    return;
+                }
+
+                SpliterAsyn.findArrBatch(url, obj).then(els => res(els));
+                return;
+            }
+
+            if (len === 3) {
+                let url = arguments[0];
+                let selector = arguments[1];
+                let attr = arguments[2];
+                let type = typeof url;
+
+                if (type === 'string') {
+                    SpliterAsyn.find(url, selector, attr).then(els => res(els));
+                    return;
+                }
+
+                SpliterAsyn.findArr(url, selector, attr).then(els => res(els));
+                return;
+            }
+
+            rej({message: 'Arguments should be from 1 to 3'});
+        });
     };
 
     // MAIN OBJECT
@@ -686,6 +805,7 @@
         Storage: Storage,
         // alieses
         find: findAs,
+        findAsyn: findAsAsyn,
         init: i => GL[i] = GL.golem
     };
 })(window);
