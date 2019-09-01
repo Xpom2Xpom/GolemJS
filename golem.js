@@ -170,7 +170,7 @@
     }
 
     // Proxy
-    class Proxy {
+    class ProxyServer {
 
         static init(host = 'localhost', port = '80', q = 'q', isSSL = false) {
             this.isUsed = true;
@@ -190,7 +190,7 @@
             this.isUsed = false;
         }
     }
-    Proxy.isUsed = false;
+    ProxyServer.isUsed = false;
 
     // Spliter
     class Spliter {
@@ -204,7 +204,7 @@
         }
 
         static get(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             let x = new GL.XMLHttpRequest();
             x.open('GET', url, false);
             x.send(null);
@@ -236,63 +236,54 @@
 
         /*
         obj = {
-            ?parentSelector: 'CSS PARENT SELECTOR',
+            ?_parentSelector: 'CSS PARENT SELECTOR',
             name1: {
-                selector: '<CSS SELECTOR>',
+                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
                 attr: 'ELEMENT ATTRIBUTE'
             },
             name2: {
-                selector: '<CSS SELECTOR>',
+                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
                 attr: 'ELEMENT ATTRIBUTE'
             },
             ...
         }
         return [{name1,name2}, {name1,name2},...]
         */
-        static findBatch(url, obj) {
-            let df = this.getDOM(url);
-            let list = {};
+        static findBatch(url, obj, parentSel) {
             let result = [];
-            let lenAll = 0;
-            if (obj.parentSelector) {
-                let ps = obj.parentSelector;
-                delete obj.parentSelector;
-                let parentEls = df.querySelectorAll(ps);
-                for (let i = 0, len = parentEls.length; i < len; i += 1) {
-                    let newObj = {};
-                    for (let o in obj) {
-                        let sel = obj[o].selector;
-                        let attr = obj[o].attr;
-                        let pEl = parentEls[i];
-                        let propEl = pEl.querySelector(sel);
-                        let prop = propEl[attr];
-                        newObj[o] = prop;
+            let df = this.getDOM(url);
+            let ps = obj._parentSelector || obj._ps || parentSel;
+            delete obj._parentSelector;
+            delete obj._ps;
+
+            if (!ps) {
+                handleSyntaxError('has not "_parentSelector" entity in config');
+            }
+
+            let parentEls = df.querySelectorAll(ps);
+
+            for (let i = 0, len = parentEls.length; i < len; i += 1) {
+                let newObj = {};
+                for (let o in obj) {
+                    let typeP = typeof obj[o];
+                    let sel;
+                    let attr;
+                    if (typeP === 'string') {
+                        let arrP = obj[o].split(' ');
+                        attr = arrP.pop();
+                        sel = arrP.join(' ');
+                    } else {
+                        sel = obj[o].selector;
+                        attr = obj[o].attr;
                     }
-                    result.push(newObj);
+                    let pEl = parentEls[i];
+                    let propEl = sel ? pEl.querySelector(sel) : pEl;
+                    let prop = propEl[attr];
+                    newObj[o] = prop;
                 }
-                return result;
+                result.push(newObj);
             }
-            for (let o in obj) {
-                list[o] = [];
-                let sel = obj[o].selector;
-                let attr = obj[o].attr;
-                let els = df.querySelectorAll(sel);
-                lenAll = els.length;
-                if (!attr) {
-                    list[o] = els;
-                } else {
-                    for (let i = 0; i < lenAll; i += 1) {
-                        list[o].push(els[i][attr]);
-                    }
-                }
-            }
-            for (let i = 0; i < lenAll; i += 1) {
-                let oo = {};
-                for (let o in list) {
-                    oo[o] = list[o][i];
-                }
-                result.push(oo);
-            }
+
             return result;
         }
 
@@ -341,28 +332,32 @@
             let start = config.from;
             let end = config.to;
             let aditionalArr = config.more;
+            let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
+
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj);
+                    let res = this.findBatch(url, obj, ps);
                     result = result.concat(res);
                 }
             }
+
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj);
+                    let res = this.findBatch(url, obj, ps);
                     result = result.concat(res);
                 });
             }
+
             return result;
         }
     }
     Spliter.cache = {};
     Spliter.parser = new DOMParser();
 
-    // SpliterAsin
-    class SpliterAsin {
+    // SpliterAsyn
+    class SpliterAsyn {
 
         static parse(str) {
             return this.parser.parseFromString(str, 'text/html');
@@ -373,12 +368,12 @@
         }
 
         static get(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.text());
         }
 
         static getJSON(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.json());
         }
 
@@ -415,7 +410,7 @@
 
         /*
         obj = {
-            ?parentSelector: 'CSS PARENT SELECTOR',
+            ?_parentSelector: 'CSS PARENT SELECTOR',
             name1: {
                 selector: '<CSS SELECTOR>',
                 attr: 'ELEMENT ATTRIBUTE'
@@ -428,30 +423,43 @@
         }
         return [{name1,name2}, {name1,name2},...]
         */
-        static findBatch(url, obj) {
+        static findBatch(url, obj, parentSel) {
             return new GL.Promise((res, rej) => {
                 let result = [];
-                if (!obj.parentSelector) {
+                let ps = obj._parentSelector || obj._ps || parentSel;
+                delete obj._parentSelector;
+                delete obj._ps;
+
+                if (!ps) {
                     rej({message: 'does not exists parentSelector'});
                 }
+
                 this.getDOM(url).then((df) => {
-                    let ps = obj.parentSelector;
-                    delete obj.parentSelector;
                     let parentEls = df.querySelectorAll(ps);
                     for (let i = 0, len = parentEls.length; i < len; i += 1) {
                         let newObj = {};
                         for (let o in obj) {
-                            let sel = obj[o].selector;
-                            let attr = obj[o].attr;
+                            let typeP = typeof obj[o];
+                            let sel;
+                            let attr;
+                            if (typeP === 'string') {
+                                let arrP = obj[o].split(' ');
+                                attr = arrP.pop();
+                                sel = arrP.join(' ');
+                            } else {
+                                sel = obj[o].selector;
+                                attr = obj[o].attr;
+                            }
                             let pEl = parentEls[i];
-                            let propEl = pEl.querySelector(sel);
+                            let propEl = sel ? pEl.querySelector(sel) : pEl;
                             let prop = propEl[attr];
                             newObj[o] = prop;
                         }
                         result.push(newObj);
                     }
+
+                    res(result);
                 });
-                res(result);
             });
         }
 
@@ -475,8 +483,9 @@
             return new GL.Promise((res, rej) => {
                 let pr = [];
                 let result = [];
+                let ps = obj._parentSelector || obj._ps;
                 urlArr.forEach(url => {
-                    pr.push(this.findBatch(url, obj));
+                    pr.push(this.findBatch(url, obj, ps));
                 });
                 GL.Promise.all(pr).then(data => {
                     data.forEach(d => {
@@ -486,9 +495,42 @@
                 });
             });
         }
+
+        // config = {from: int, to: int, ?more: [string]}
+        static findRangeBatch(urlTemplate, config, obj) {
+            return new GL.Promise((res, rej) => {
+                let pr = [];
+                let result = [];
+                let start = config.from;
+                let end = config.to;
+                let aditionalArr = config.more;
+                let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
+
+                if ((typeof start === 'number') && (typeof end === 'number')) {
+                    for (let i = start; i <= end; i += 1) {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.findBatch(url, obj, ps));
+                    }
+                }
+
+                if (aditionalArr) {
+                    aditionalArr.forEach(i => {
+                        let url = StringBuilder.build(urlTemplate, i);
+                        pr.push(this.findBatch(url, obj, ps));
+                    });
+                }
+
+                GL.Promise.all(pr).then(data => {
+                    data.forEach(d => {
+                        result = result.concat(d);
+                    });
+                    res(result);
+                });
+            });
+        }
     }
-    SpliterAsin.cache = {};
-    SpliterAsin.parser = new DOMParser();
+    SpliterAsyn.cache = {};
+    SpliterAsyn.parser = new DOMParser();
 
     // localStorage
     class Storage {
@@ -602,8 +644,154 @@
         }
     }
 
+    // Error handlers
+    function handleSyntaxError(message) {
+        throw new SyntaxError(message);
+    }
+
+    // Global aliases
+    function findAs() {
+        let len = arguments.length;
+
+        if (len === 1) {
+            let arg = arguments[0];
+            let url = arg._url;
+            let config = {
+                from: arg._from,
+                to: arg._to,
+                more: arg._more,
+                ps: arg._parentSelector || arg._ps
+            };
+
+            if (!url) {
+                handleSyntaxError('has not url for finding');
+            }
+            if (!config.from) {
+                handleSyntaxError('has not "from" entry point');
+            }
+            if (!config.to) {
+                handleSyntaxError('has not "to" end point');
+            }
+            if (!config.ps) {
+                handleSyntaxError('has not "_parentSelector" entity in config');
+            }
+
+            delete arg._url;
+            delete arg._from;
+            delete arg._to;
+            delete arg._more;
+            delete arg._ps;
+            delete arg._parentSelector;
+
+            let res = Spliter.findRangeBatch(url, config, arg);
+            return res;
+        }
+
+        if (len === 2) {
+            let url = arguments[0];
+            let obj = arguments[1];
+            let type = typeof url;
+
+            if (type === 'string') {
+                let res = Spliter.findBatch(url, obj);
+                return res;
+            }
+
+            let res = Spliter.findArrBatch(url, obj);
+            return res;
+        }
+
+        if (len === 3) {
+            let url = arguments[0];
+            let selector = arguments[1];
+            let attr = arguments[2];
+            let type = typeof url;
+
+            if (type === 'string') {
+                let res = Spliter.find(url, selector, attr);
+                return res;
+            }
+
+            let res = Spliter.findArr(url, selector, attr);
+            return res;
+        }
+
+        handleSyntaxError('Arguments should be from 1 to 3');
+    };
+
+    function findAsAsyn() {
+        return new GL.Promise((res, rej) => {
+            let len = arguments.length;
+
+            if (len === 1) {
+                let arg = arguments[0];
+                let url = arg._url;
+                let config = {
+                    from: arg._from,
+                    to: arg._to,
+                    more: arg._more,
+                    ps: arg._parentSelector || arg._ps
+                };
+
+                if (!url) {
+                    rej('has not url for finding');
+                }
+                if (!config.from) {
+                    rej('has not "from" entry point');
+                }
+                if (!config.to) {
+                    rej('has not "to" end point');
+                }
+                if (!config.ps) {
+                    rej('has not "_parentSelector" entity in config');
+                }
+
+                delete arg._url;
+                delete arg._from;
+                delete arg._to;
+                delete arg._more;
+                delete arg._ps;
+                delete arg._parentSelector;
+
+                SpliterAsyn.findRangeBatch(url, config, arg).then(els => res(els));
+                return;
+            }
+
+            if (len === 2) {
+                let url = arguments[0];
+                let obj = arguments[1];
+                let type = typeof url;
+
+                if (type === 'string') {
+                    SpliterAsyn.findBatch(url, obj).then(els => res(els));
+                    return;
+                }
+
+                SpliterAsyn.findArrBatch(url, obj).then(els => res(els));
+                return;
+            }
+
+            if (len === 3) {
+                let url = arguments[0];
+                let selector = arguments[1];
+                let attr = arguments[2];
+                let type = typeof url;
+
+                if (type === 'string') {
+                    SpliterAsyn.find(url, selector, attr).then(els => res(els));
+                    return;
+                }
+
+                SpliterAsyn.findArr(url, selector, attr).then(els => res(els));
+                return;
+            }
+
+            rej({message: 'Arguments should be from 1 to 3'});
+        });
+    };
+
     // MAIN OBJECT
-    const version = '0.1.4';
+    const version = '0.2.0';
     GL.golem = {
         version: version,
         utils: {
@@ -611,10 +799,13 @@
             UrlBuilder: UrlBuilder,
             Analytics: Analytics
         },
-        Proxy: Proxy,
+        Proxy: ProxyServer,
         Spliter: Spliter,
-        SpliterAsyn: SpliterAsin,
+        SpliterAsyn: SpliterAsyn,
         Storage: Storage,
+        // alieses
+        find: findAs,
+        findAsyn: findAsAsyn,
         init: i => GL[i] = GL.golem
     };
 })(window);
