@@ -1,6 +1,6 @@
 {
   "name": "golemjs",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "es6 lib to get data from static pages",
   "main": "golem.js",
   "scripts": {
