@@ -170,7 +170,7 @@
     }
 
     // Proxy
-    class Proxy {
+    class ProxyServer {
 
         static init(host = 'localhost', port = '80', q = 'q', isSSL = false) {
             this.isUsed = true;
@@ -190,7 +190,7 @@
             this.isUsed = false;
         }
     }
-    Proxy.isUsed = false;
+    ProxyServer.isUsed = false;
 
     // Spliter
     class Spliter {
@@ -204,7 +204,7 @@
         }
 
         static get(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             let x = new GL.XMLHttpRequest();
             x.open('GET', url, false);
             x.send(null);
@@ -373,12 +373,12 @@
         }
 
         static get(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.text());
         }
 
         static getJSON(url) {
-            url = Proxy.isUsed ? Proxy.getProxyString(url) : url;
+            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
             return GL.fetch(url).then(r => r.json());
         }
 
@@ -611,7 +611,7 @@
             UrlBuilder: UrlBuilder,
             Analytics: Analytics
         },
-        Proxy: Proxy,
+        Proxy: ProxyServer,
         Spliter: Spliter,
         SpliterAsyn: SpliterAsin,
         Storage: Storage,
