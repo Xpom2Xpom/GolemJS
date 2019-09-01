@@ -630,9 +630,9 @@
             let config = {
                 from: arg._from,
                 to: arg._to,
-                more: arg._more
+                more: arg._more,
+                ps: arg._parentSelector || arg._ps
             };
-            let ps = arg._parentSelector || arg._ps;
 
             if (!url){
                 handleSyntaxError('has not url for finding');
@@ -643,7 +643,7 @@
             if (!config.to){
                 handleSyntaxError('has not "to" end point');
             }
-            if (!ps){
+            if (!config.ps){
                 handleSyntaxError('has not "_parentSelector" entity in config');
             }
 
