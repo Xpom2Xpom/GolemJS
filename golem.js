@@ -236,35 +236,47 @@
 
         /*
         obj = {
-            ?parentSelector: 'CSS PARENT SELECTOR',
+            ?_parentSelector: 'CSS PARENT SELECTOR',
             name1: {
-                selector: '<CSS SELECTOR>',
+                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
                 attr: 'ELEMENT ATTRIBUTE'
             },
             name2: {
-                selector: '<CSS SELECTOR>',
+                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
                 attr: 'ELEMENT ATTRIBUTE'
             },
             ...
         }
         return [{name1,name2}, {name1,name2},...]
         */
-        static findBatch(url, obj) {
+        static findBatch(url, obj, parentSel) {
             let df = this.getDOM(url);
             let list = {};
             let result = [];
             let lenAll = 0;
-            if (obj.parentSelector) {
-                let ps = obj.parentSelector;
-                delete obj.parentSelector;
+            if (obj._parentSelector || obj._ps || parentSel) {
+                let ps = obj._parentSelector || obj._ps || parentSel;
+                delete obj._parentSelector;
+                delete obj._ps;
                 let parentEls = df.querySelectorAll(ps);
                 for (let i = 0, len = parentEls.length; i < len; i += 1) {
                     let newObj = {};
                     for (let o in obj) {
-                        let sel = obj[o].selector;
-                        let attr = obj[o].attr;
+                        let typeP = typeof obj[o];
+                        let sel;
+                        let attr;
+                        if (typeP === 'string') {
+                            let arrP = obj[o].split(' ');
+                            let lenP = arrP.length;
+                            attr = arrP[lenP - 1];
+                            arrP.pop();
+                            sel = arrP.join(' ');
+                        } else {
+                            sel = obj[o].selector;
+                            attr = obj[o].attr;
+                        }
                         let pEl = parentEls[i];
-                        let propEl = pEl.querySelector(sel);
+                        let propEl = sel ? pEl.querySelector(sel) : pEl;
                         let prop = propEl[attr];
                         newObj[o] = prop;
                     }
@@ -341,17 +353,18 @@
             let start = config.from;
             let end = config.to;
             let aditionalArr = config.more;
+            let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj);
+                    let res = this.findBatch(url, obj, ps);
                     result = result.concat(res);
                 }
             }
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj);
+                    let res = this.findBatch(url, obj, ps);
                     result = result.concat(res);
                 });
             }
@@ -602,8 +615,83 @@
         }
     }
 
+    // Error handlers
+    function handleSyntaxError(message){
+        throw new SyntaxError(message);
+    }
+
+    // Global aliases
+    function findAs(){
+        let len = arguments.length;
+
+        if (len === 1){
+            let arg = arguments[0];
+            let url = arg._url;
+            let config = {
+                from: arg._from,
+                to: arg._to,
+                more: arg._more
+            };
+            let ps = arg._parentSelector || arg._ps;
+
+            if (!url){
+                handleSyntaxError('has not url for finding');
+            }
+            if (!from){
+                handleSyntaxError('has not "from" entry point');
+            }
+            if (!to){
+                handleSyntaxError('has not "to" end point');
+            }
+            if (!ps){
+                handleSyntaxError('has not "_parentSelector" entity in config');
+            }
+
+            delete arg._url;
+            delete arg._from;
+            delete arg._to;
+            delete arg._more;
+            delete arg._ps;
+            delete arg._parentSelector;
+
+            let res = Spliter.findRangeBatch(url, config, arg);
+            return res;
+        }
+
+        if (len === 2){
+            let url = arguments[0];
+            let obj = arguments[1];
+            let type = typeof url;
+
+            if (type === 'string'){
+                let res = Spliter.findBatch(url, obj);
+                return res;
+            }
+
+            let res = Spliter.findArrBatch(url, obj);
+            return res;
+        }
+
+        if (len === 3){
+            let url = arguments[0];
+            let selector = arguments[1];
+            let attr = arguments[2];
+            let type = typeof url;
+
+            if (type === 'string'){
+                let res = Spliter.find(url, selector, attr);
+                return res;
+            }
+
+            let res = Spliter.findArr(url, selector, attr);
+            return res;
+        }
+
+        handleSyntaxError('Arguments should be from 1 to 3');
+    };
+
     // MAIN OBJECT
-    const version = '0.1.4';
+    const version = '0.2.0';
     GL.golem = {
         version: version,
         utils: {
@@ -615,6 +703,8 @@
         Spliter: Spliter,
         SpliterAsyn: SpliterAsin,
         Storage: Storage,
+        // alieses
+        find: findAs,
         init: i => GL[i] = GL.golem
     };
 })(window);
