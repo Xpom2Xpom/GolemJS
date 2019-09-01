@@ -251,60 +251,41 @@
         */
         static findBatch(url, obj, parentSel) {
             let df = this.getDOM(url);
-            let list = {};
+            let ps = obj._parentSelector || obj._ps || parentSel;
+            delete obj._parentSelector;
+            delete obj._ps;
             let result = [];
-            let lenAll = 0;
-            if (obj._parentSelector || obj._ps || parentSel) {
-                let ps = obj._parentSelector || obj._ps || parentSel;
-                delete obj._parentSelector;
-                delete obj._ps;
-                let parentEls = df.querySelectorAll(ps);
-                for (let i = 0, len = parentEls.length; i < len; i += 1) {
-                    let newObj = {};
-                    for (let o in obj) {
-                        let typeP = typeof obj[o];
-                        let sel;
-                        let attr;
-                        if (typeP === 'string') {
-                            let arrP = obj[o].split(' ');
-                            let lenP = arrP.length;
-                            attr = arrP[lenP - 1];
-                            arrP.pop();
-                            sel = arrP.join(' ');
-                        } else {
-                            sel = obj[o].selector;
-                            attr = obj[o].attr;
-                        }
-                        let pEl = parentEls[i];
-                        let propEl = sel ? pEl.querySelector(sel) : pEl;
-                        let prop = propEl[attr];
-                        newObj[o] = prop;
+
+            if (!ps) {
+                handleSyntaxError('has not "_parentSelector" entity in config');
+            }
+
+            let parentEls = df.querySelectorAll(ps);
+
+            for (let i = 0, len = parentEls.length; i < len; i += 1) {
+                let newObj = {};
+                for (let o in obj) {
+                    let typeP = typeof obj[o];
+                    let sel;
+                    let attr;
+                    if (typeP === 'string') {
+                        let arrP = obj[o].split(' ');
+                        let lenP = arrP.length;
+                        attr = arrP[lenP - 1];
+                        arrP.pop();
+                        sel = arrP.join(' ');
+                    } else {
+                        sel = obj[o].selector;
+                        attr = obj[o].attr;
                     }
-                    result.push(newObj);
+                    let pEl = parentEls[i];
+                    let propEl = sel ? pEl.querySelector(sel) : pEl;
+                    let prop = propEl[attr];
+                    newObj[o] = prop;
                 }
-                return result;
+                result.push(newObj);
             }
-            for (let o in obj) {
-                list[o] = [];
-                let sel = obj[o].selector;
-                let attr = obj[o].attr;
-                let els = df.querySelectorAll(sel);
-                lenAll = els.length;
-                if (!attr) {
-                    list[o] = els;
-                } else {
-                    for (let i = 0; i < lenAll; i += 1) {
-                        list[o].push(els[i][attr]);
-                    }
-                }
-            }
-            for (let i = 0; i < lenAll; i += 1) {
-                let oo = {};
-                for (let o in list) {
-                    oo[o] = list[o][i];
-                }
-                result.push(oo);
-            }
+            
             return result;
         }
 
