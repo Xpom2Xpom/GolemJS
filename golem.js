@@ -285,7 +285,7 @@
                 }
                 result.push(newObj);
             }
-            
+
             return result;
         }
 
@@ -355,8 +355,8 @@
     Spliter.cache = {};
     Spliter.parser = new DOMParser();
 
-    // SpliterAsin
-    class SpliterAsin {
+    // SpliterAsyn
+    class SpliterAsyn {
 
         static parse(str) {
             return this.parser.parseFromString(str, 'text/html');
@@ -481,8 +481,8 @@
             });
         }
     }
-    SpliterAsin.cache = {};
-    SpliterAsin.parser = new DOMParser();
+    SpliterAsyn.cache = {};
+    SpliterAsyn.parser = new DOMParser();
 
     // localStorage
     class Storage {
@@ -682,7 +682,7 @@
         },
         Proxy: ProxyServer,
         Spliter: Spliter,
-        SpliterAsyn: SpliterAsin,
+        SpliterAsyn: SpliterAsyn,
         Storage: Storage,
         // alieses
         find: findAs,
