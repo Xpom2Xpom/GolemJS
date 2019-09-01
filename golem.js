@@ -637,10 +637,10 @@
             if (!url){
                 handleSyntaxError('has not url for finding');
             }
-            if (!from){
+            if (!config.from){
                 handleSyntaxError('has not "from" entry point');
             }
-            if (!to){
+            if (!config.to){
                 handleSyntaxError('has not "to" end point');
             }
             if (!ps){
