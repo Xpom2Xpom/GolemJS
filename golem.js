@@ -172,18 +172,34 @@
     // Proxy
     class ProxyServer {
 
-        static init(host = 'localhost', port = '80', q = 'q', isSSL = false) {
+        static init(host = 'localhost', port = '80', queryStringSign = 'q', isSSL = false) {
             this.isUsed = true;
-            this.protocol = isSSL ? 'https://' : 'http://';
+            this.protocol = isSSL ? 'https' : 'http';
             this.host = host;
             this.port = port;
-            this.queryString = q;
+            this.queryStringSign = queryStringSign;
             this.isSSL = isSSL;
         }
 
+        static getProxyStringFromParams(url) {
+            return `${this.protocol}://${this.host}:${this.port}?${this.queryStringSign}=${url}`;
+        }
+
+        static initWithTemplate(tml, replaceSign = '{1}') {
+            this.tml = tml;
+            this.replaceSign = replaceSign;
+        }
+
+        static getProxyStringFromTemplate(url) {
+            return this.tml && this.replaceSign ? this.tml.replace(this.replaceSign, url) : '';
+        }
+
         static getProxyString(url) {
-            let str = this.protocol + this.host + ':' + this.port + '?' + this.queryString + '=' + url;
-            return str;
+            if (!this.isUsed) {
+                return url;
+            }
+
+            return this.tml ? this.getProxyStringFromTemplate(url) : this.getProxyStringFromParams(url);
         }
 
         static cancel() {
@@ -204,7 +220,7 @@
         }
 
         static get(url) {
-            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
+            url = ProxyServer.getProxyString(url);
             let x = new GL.XMLHttpRequest();
             x.open('GET', url, false);
             x.send(null);
@@ -368,12 +384,12 @@
         }
 
         static get(url) {
-            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
+            url = ProxyServer.getProxyString(url);
             return GL.fetch(url).then(r => r.text());
         }
 
         static getJSON(url) {
-            url = ProxyServer.isUsed ? ProxyServer.getProxyString(url) : url;
+            url = ProxyServer.getProxyString(url);
             return GL.fetch(url).then(r => r.json());
         }
 
@@ -535,12 +551,20 @@
     // localStorage
     class Storage {
 
-        static set(storageName, obj) {
+        static set(storageName, val) {
+            GL.localStorage.setItem(storageName, val);
+        }
+
+        static setObj(storageName, obj) {
             let storageObj = JSON.stringify(obj);
             GL.localStorage.setItem(storageName, storageObj);
         }
 
         static get(storageName) {
+            return GL.localStorage.getItem(storageName);
+        }
+
+        static getObj(storageName) {
             let obj = GL.localStorage.getItem(storageName);
             return JSON.parse(obj);
         }
@@ -551,96 +575,6 @@
 
         static clear() {
             GL.localStorage.clear();
-        }
-    }
-
-    // Analitics
-    class Aset {
-        constructor(target, result) {
-            this.lengthTarget = target.length;
-            this.lengthResult = result.length;
-            this.target = target;
-            this.result = result;
-            this.max = result[0];
-            this.min = result[result.length - 1];
-        }
-
-        getMax(n) {
-            if (!n) {
-                return this.max;
-            }
-            if (n > this.lengthResult - 1) {
-                n = this.lengthResult;
-            }
-            let res = [];
-            for (let i = 0, len = n; i < len; i += 1) {
-                res[i] = this.result[i];
-            }
-            return res;
-        }
-
-        getMin(n) {
-            if (!n) {
-                return this.min;
-            }
-            if (n > this.lengthResult) {
-                n = this.lengthResult;
-            }
-            let res = [];
-            for (let i = this.lengthResult - 1, len = this.lengthResult - n; i >= len; i -= 1) {
-                res.push(this.result[i]);
-            }
-            return res;
-        }
-
-        getMinAsString(n = 1, sep1, sep2) {
-            return this.asString(sep1, sep2, this.getMax(n));
-        }
-
-        asString(sep1 = ', ', sep2 = ' - ') {
-            let res = '';
-            let len = this.result.length;
-            this.result.forEach((val, ii) => {
-                res += '"' + val.value + '"' + sep2 + val.repeat + sep2 + val.percent + '%';
-                if (ii < len - 1) {
-                    res += sep1;
-                }
-            });
-            return res;
-        }
-    }
-
-    class Analytics {
-
-        static getAset(arr) {
-            let len = arr.length;
-            let o = {};
-            arr.forEach((val, i) => {
-                if (!o[val]) {
-                    o[val] = 0;
-                    for (let j = i; j < len; j += 1) {
-                        if (val === arr[j]) {
-                            o[val] += 1;
-                        }
-                    }
-                }
-            });
-
-            // sort
-            let newArr = [];
-            for (let i in o) {
-                newArr.push({
-                    value: i,
-                    repeat: o[i],
-                    percent: (o[i] / len * 100).toFixed(2)
-                });
-            }
-            newArr.sort(function(a, b) {
-                return b.repeat - a.repeat;
-            });
-
-            // res
-            return new Aset(arr, newArr);
         }
     }
 
@@ -719,7 +653,7 @@
         handleSyntaxError('Arguments should be from 1 to 3');
     };
 
-    function findAsAsyn() {
+    function fetchAs() {
         return new GL.Promise((res, rej) => {
             let len = arguments.length;
 
@@ -791,21 +725,18 @@
     };
 
     // MAIN OBJECT
-    const version = '0.2.0';
+    const version = '0.3.0';
     GL.golem = {
         version: version,
         utils: {
             StringBuilder: StringBuilder,
-            UrlBuilder: UrlBuilder,
-            Analytics: Analytics
+            UrlBuilder: UrlBuilder
         },
         Proxy: ProxyServer,
-        Spliter: Spliter,
-        SpliterAsyn: SpliterAsyn,
         Storage: Storage,
         // alieses
         find: findAs,
-        findAsyn: findAsAsyn,
+        fetch: fetchAs,
         init: i => GL[i] = GL.golem
     };
 })(window);
