@@ -1,6 +1,13 @@
 'use strict';
 
 ((GL) => {
+    //Messages
+    class Messager {}
+    Messager.ERROR_PARENT_SELECTOR = 'Parrent selector does not exists';
+    Messager.NO_URL = 'Has not url for finding';
+    Messager.NO_FROM_EP = 'Has not "from" entry point';
+    Messager.NO_TO_EP = 'Has not "to" end point';
+    Messager.NO_ARG = 'Arguments should be from 1 to 3';
 
     // StringBuilder
     class StringBuilder {
@@ -90,6 +97,7 @@
         static trim(url) {
             url = url.replace('http://', '');
             url = url.replace('https://', '');
+            url = url.replace('file://', '');
             url = url.split('?')[0];
             return url;
         }
@@ -208,15 +216,29 @@
     }
     ProxyServer.isUsed = false;
 
+    // Cacher
+    class Cacher {
+
+        static set(url, df) {
+            this.cache[url] = df;
+        }
+
+        static get(url) {
+            return this.cache[url];
+        }
+
+        static clear() {
+            this.cache = {};
+        }
+
+    }
+    Cacher.cache = {};
+
     // Spliter
     class Spliter {
 
         static parse(str) {
             return this.parser.parseFromString(str, 'text/html');
-        }
-
-        static clearCache() {
-            this.cache = {};
         }
 
         static get(url) {
@@ -228,12 +250,14 @@
         }
 
         static getDOM(url) {
-            if (this.cache[url]) {
-                return this.cache[url];
+            let dfCached = Cacher.get(url);
+            if (dfCached) {
+                return dfCached;
             }
+
             let txt = this.get(url);
             let df = this.parse(txt);
-            this.cache[url] = df;
+            Cacher.set(url, df);
             return df;
         }
 
@@ -250,65 +274,67 @@
             return result;
         }
 
-        /*
-        obj = {
-            ?_parentSelector: 'CSS PARENT SELECTOR',
-            name1: {
-                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
-                attr: 'ELEMENT ATTRIBUTE'
-            },
-            name2: {
-                selector: '<CSS SELECTOR>', // or '' if _parentSelector is base elements
-                attr: 'ELEMENT ATTRIBUTE'
-            },
-            ...
-        }
-        return [{name1,name2}, {name1,name2},...]
-        */
-        static findBatch(url, obj, parentSel) {
-            let result = [];
-            let df = this.getDOM(url);
-            let ps = obj._parentSelector || obj._ps || parentSel;
-            delete obj._parentSelector;
-            delete obj._ps;
-
-            if (!ps) {
-                handleSyntaxError('has not "_parentSelector" entity in config');
-            }
-
-            let parentEls = df.querySelectorAll(ps);
-
-            for (let i = 0, len = parentEls.length; i < len; i += 1) {
-                let newObj = {};
-                for (let o in obj) {
-                    let typeP = typeof obj[o];
-                    let sel;
-                    let attr;
-                    if (typeP === 'string') {
-                        let arrP = obj[o].split(' ');
-                        attr = arrP.pop();
-                        sel = arrP.join(' ');
-                    } else {
-                        sel = obj[o].selector;
-                        attr = obj[o].attr;
-                    }
-                    let pEl = parentEls[i];
-                    let propEl = sel ? pEl.querySelector(sel) : pEl;
-                    let prop = propEl[attr];
-                    newObj[o] = prop;
-                }
-                result.push(newObj);
-            }
-
-            return result;
-        }
-
         static findArr(urlArr, selector, attr) {
             let result = [];
             urlArr.forEach(url => {
                 let res = this.find(url, selector, attr);
                 result = result.concat(res);
             });
+            return result;
+        }
+
+        /*
+        obj = {
+            _parentSelector: 'CSS PARENT SELECTOR',
+            name1: '?<CSS SELECTOR> <ELEMENT ATTRIBUTE>',
+            name2: '?<CSS SELECTOR> <ELEMENT ATTRIBUTE>',
+            ...
+        }
+        return [{name1,name2}, {name1,name2},...]
+        */
+        static findBatch(url, objParam) {
+            let result = [];
+            let df = this.getDOM(url);
+
+            let ps = objParam._parentSelector || objParam._ps;
+            let obj = Object.assign({}, objParam);
+            delete obj._parentSelector;
+            delete obj._ps;
+
+            if (!ps) {
+                handleSyntaxError(Messager.ERROR_PARENT_SELECTOR);
+            }
+
+            let parentEls = df.querySelectorAll(ps);
+
+            for (let i = 0, len = parentEls.length; i < len; i += 1) {
+                let newObj = {};
+                let isExists = false;
+                for (let o in obj) {
+                    let objStr = obj[o];
+                    let objArr = objStr.split(' ');
+                    let attr = objArr.pop();
+                    let selector = objArr.join(' ');
+                    let parentEl = parentEls[i];
+                    let childEl = selector ? parentEl.querySelector(selector) : parentEl;
+                    let prop;
+                    if (childEl) {
+                        prop = childEl[attr];
+                    } else {
+                        continue;
+                    }
+                    newObj[o] = prop;
+                    isExists = true;
+                }
+
+                if (isExists) {
+                    result.push(newObj);
+                    isExists = false;
+                } else {
+                    continue;
+                }
+            }
+
             return result;
         }
 
@@ -321,39 +347,26 @@
             return result;
         }
 
-        static findRange(urlTemplate, start, end, selector, attr, aditionalArr) {
-            let result = [];
-            start = Number.parseInt(start);
-            end = Number.parseInt(end);
-            if ((typeof start === 'number') && (typeof end === 'number')) {
-                for (let i = start; i <= end; i += 1) {
-                    let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.find(url, selector, attr);
-                    result = result.concat(res);
-                }
-            }
-            if (aditionalArr) {
-                aditionalArr.forEach(i => {
-                    let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.find(url, selector, attr);
-                    result = result.concat(res);
-                });
-            }
-            return result;
-        }
-
         // config = {from: int, to: int, ?more: [string]}
-        static findRangeBatch(urlTemplate, config, obj) {
+        static findRange(urlTemplate, config, obj) {
             let result = [];
             let start = config.from;
             let end = config.to;
             let aditionalArr = config.more;
-            let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
+            let objType = typeof obj;
 
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj, ps);
+                    let res;
+                    if (objType === 'string') {
+                        let arr = obj.split(' ');
+                        let attr = arr.pop();
+                        let selector = arr.join(' ');
+                        res = this.find(url, selector, attr);
+                    } else {
+                        res = this.findBatch(url, obj);
+                    }
                     result = result.concat(res);
                 }
             }
@@ -361,7 +374,15 @@
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res = this.findBatch(url, obj, ps);
+                    let res;
+                    if (objType === 'string') {
+                        let arr = obj.split(' ');
+                        let attr = arr.pop();
+                        let selector = arr.join(' ');
+                        res = this.find(url, selector, attr);
+                    } else {
+                        res = this.findBatch(url, obj);
+                    }
                     result = result.concat(res);
                 });
             }
@@ -369,7 +390,6 @@
             return result;
         }
     }
-    Spliter.cache = {};
     Spliter.parser = new DOMParser();
 
     // SpliterAsyn
@@ -593,40 +613,35 @@
             let config = {
                 from: arg._from,
                 to: arg._to,
-                more: arg._more,
-                ps: arg._parentSelector || arg._ps
+                more: arg._more
             };
 
             if (!url) {
-                handleSyntaxError('has not url for finding');
+                handleSyntaxError(Messager.NO_URL);
             }
             if (!config.from) {
-                handleSyntaxError('has not "from" entry point');
+                handleSyntaxError(Messager.NO_FROM_EP);
             }
             if (!config.to) {
-                handleSyntaxError('has not "to" end point');
-            }
-            if (!config.ps) {
-                handleSyntaxError('has not "_parentSelector" entity in config');
+                handleSyntaxError(Messager.NO_TO_EP);
             }
 
-            delete arg._url;
-            delete arg._from;
-            delete arg._to;
-            delete arg._more;
-            delete arg._ps;
-            delete arg._parentSelector;
+            let obj = Object.assign({}, arg);
+            delete obj._url;
+            delete obj._from;
+            delete obj._to;
+            delete obj._more;
 
-            let res = Spliter.findRangeBatch(url, config, arg);
+            let res = Spliter.findRange(url, config, obj);
             return res;
         }
 
         if (len === 2) {
             let url = arguments[0];
             let obj = arguments[1];
-            let type = typeof url;
+            let urlType = typeof url;
 
-            if (type === 'string') {
+            if (urlType === 'string') {
                 let res = Spliter.findBatch(url, obj);
                 return res;
             }
@@ -650,7 +665,7 @@
             return res;
         }
 
-        handleSyntaxError('Arguments should be from 1 to 3');
+        handleSyntaxError(Messager.NO_ARG);
     };
 
     function fetchAs() {
