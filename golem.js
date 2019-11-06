@@ -353,20 +353,11 @@
             let start = config.from;
             let end = config.to;
             let aditionalArr = config.more;
-            let objType = typeof obj;
 
             if ((typeof start === 'number') && (typeof end === 'number')) {
                 for (let i = start; i <= end; i += 1) {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res;
-                    if (objType === 'string') {
-                        let arr = obj.split(' ');
-                        let attr = arr.pop();
-                        let selector = arr.join(' ');
-                        res = this.find(url, selector, attr);
-                    } else {
-                        res = this.findBatch(url, obj);
-                    }
+                    let res = this.findBatch(url, obj);
                     result = result.concat(res);
                 }
             }
@@ -374,15 +365,7 @@
             if (aditionalArr) {
                 aditionalArr.forEach(i => {
                     let url = StringBuilder.build(urlTemplate, i);
-                    let res;
-                    if (objType === 'string') {
-                        let arr = obj.split(' ');
-                        let attr = arr.pop();
-                        let selector = arr.join(' ');
-                        res = this.find(url, selector, attr);
-                    } else {
-                        res = this.findBatch(url, obj);
-                    }
+                    let res = this.findBatch(url, obj);
                     result = result.concat(res);
                 });
             }
