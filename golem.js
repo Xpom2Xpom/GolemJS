@@ -9,6 +9,13 @@
     Messager.NO_TO_EP = 'Has not "to" end point';
     Messager.NO_ARG = 'Arguments should be from 1 to 3';
 
+    //Config
+    const CONFIG_URL = '_url';
+    const CONFIG_FROM = '_from';
+    const CONFIG_TO = '_to';
+    const CONFIG_MORE = '_more';
+    const CONFIG_PARENT_SELECTOR = '_ps';
+
     // StringBuilder
     class StringBuilder {
 
@@ -180,7 +187,7 @@
     // Proxy
     class ProxyServer {
 
-        static init(host = 'localhost', port = '80', queryStringSign = 'q', isSSL = false) {
+        static init(port = '80', host = 'localhost', queryStringSign = 'q', isSSL = false) {
             this.isUsed = true;
             this.protocol = isSSL ? 'https' : 'http';
             this.host = host;
@@ -190,16 +197,17 @@
         }
 
         static getProxyStringFromParams(url) {
-            return `${this.protocol}://${this.host}:${this.port}?${this.queryStringSign}=${url}`;
+            return `${this.protocol}://${this.host}:${this.port}?${this.queryStringSign}=${encodeURIComponent(url)}`;
         }
 
         static initWithTemplate(tml, replaceSign = '{1}') {
+            this.isUsed = true;
             this.tml = tml;
             this.replaceSign = replaceSign;
         }
 
         static getProxyStringFromTemplate(url) {
-            return this.tml && this.replaceSign ? this.tml.replace(this.replaceSign, url) : '';
+            return this.tml && this.replaceSign ? this.tml.replace(this.replaceSign, encodeURIComponent(url)) : '';
         }
 
         static getProxyString(url) {
@@ -293,19 +301,24 @@
         return [{name1,name2}, {name1,name2},...]
         */
         static findBatch(url, objParam) {
-            let result = [];
             let df = this.getDOM(url);
 
-            let ps = objParam._parentSelector || objParam._ps;
+            let ps = objParam._parentSelector || objParam[CONFIG_PARENT_SELECTOR];
             let obj = Object.assign({}, objParam);
             delete obj._parentSelector;
-            delete obj._ps;
+            delete obj[CONFIG_PARENT_SELECTOR];
 
             if (!ps) {
                 handleSyntaxError(Messager.ERROR_PARENT_SELECTOR);
             }
 
             let parentEls = df.querySelectorAll(ps);
+            let result = this._getFromParent(parentEls, obj);
+            return result;
+        }
+
+        static _getFromParent(parentEls, obj) {
+            let result = [];
 
             for (let i = 0, len = parentEls.length; i < len; i += 1) {
                 let newObj = {};
@@ -382,10 +395,6 @@
             return this.parser.parseFromString(str, 'text/html');
         }
 
-        static clearCache() {
-            this.cache = {};
-        }
-
         static get(url) {
             url = ProxyServer.getProxyString(url);
             return GL.fetch(url).then(r => r.text());
@@ -398,12 +407,13 @@
 
         static getDOM(url) {
             return new GL.Promise((res, rej) => {
-                if (this.cache[url]) {
-                    res(this.cache[url]);
+                let cache = Cacher.get(url);
+                if (cache) {
+                    res(cache);
                 } else {
                     this.get(url).then(txt => {
                         let df = this.parse(txt);
-                        this.cache[url] = df;
+                        Cacher.set(url, df);
                         res(df);
                     });
                 }
@@ -548,7 +558,6 @@
             });
         }
     }
-    SpliterAsyn.cache = {};
     SpliterAsyn.parser = new DOMParser();
 
     // localStorage
@@ -592,28 +601,28 @@
 
         if (len === 1) {
             let arg = arguments[0];
-            let url = arg._url;
+            let url = arg[CONFIG_URL];
             let config = {
-                from: arg._from,
-                to: arg._to,
-                more: arg._more
+                from: arg[CONFIG_FROM],
+                to: arg[CONFIG_TO],
+                more: arg[CONFIG_MORE]
             };
 
             if (!url) {
                 handleSyntaxError(Messager.NO_URL);
             }
             if (!config.from) {
-                handleSyntaxError(Messager.NO_FROM_EP);
+                console.log(Messager.NO_FROM_EP);
             }
             if (!config.to) {
-                handleSyntaxError(Messager.NO_TO_EP);
+                console.log(Messager.NO_TO_EP);
             }
 
             let obj = Object.assign({}, arg);
-            delete obj._url;
-            delete obj._from;
-            delete obj._to;
-            delete obj._more;
+            delete obj[CONFIG_URL];
+            delete obj[CONFIG_FROM];
+            delete obj[CONFIG_TO];
+            delete obj[CONFIG_MORE];
 
             let res = Spliter.findRange(url, config, obj);
             return res;
@@ -657,35 +666,29 @@
 
             if (len === 1) {
                 let arg = arguments[0];
-                let url = arg._url;
+                let url = arg[CONFIG_URL];
                 let config = {
-                    from: arg._from,
-                    to: arg._to,
-                    more: arg._more,
-                    ps: arg._parentSelector || arg._ps
+                    from: arg[CONFIG_FROM],
+                    to: arg[CONFIG_TO],
+                    more: arg[CONFIG_MORE]
                 };
 
                 if (!url) {
-                    rej('has not url for finding');
+                    rej(Messager.NO_URL);
                 }
                 if (!config.from) {
-                    rej('has not "from" entry point');
+                    console.log(Messager.NO_FROM_EP);
                 }
                 if (!config.to) {
-                    rej('has not "to" end point');
-                }
-                if (!config.ps) {
-                    rej('has not "_parentSelector" entity in config');
+                    console.log(Messager.NO_TO_EP);
                 }
 
-                delete arg._url;
-                delete arg._from;
-                delete arg._to;
-                delete arg._more;
-                delete arg._ps;
-                delete arg._parentSelector;
+                delete arg[CONFIG_URL];
+                delete arg[CONFIG_FROM];
+                delete arg[CONFIG_TO];
+                delete arg[CONFIG_MORE];
 
-                SpliterAsyn.findRangeBatch(url, config, arg).then(els => res(els));
+                SpliterAsyn.findRange(url, config, arg).then(els => res(els));
                 return;
             }
 
@@ -718,12 +721,16 @@
                 return;
             }
 
-            rej({message: 'Arguments should be from 1 to 3'});
+            rej({message: Messager.NO_ARG});
         });
     };
 
+    function clearCache() {
+        Cacher.clear();
+    }
+
     // MAIN OBJECT
-    const version = '0.3.0';
+    const version = '0.4.0';
     GL.golem = {
         version: version,
         utils: {
@@ -735,6 +742,8 @@
         // alieses
         find: findAs,
         fetch: fetchAs,
+        clearCache: clearCache,
+        // init
         init: i => GL[i] = GL.golem
     };
 })(window);
