@@ -1,6 +1,16 @@
 'use strict';
 
 ((GL) => {
+    //Config
+    const CONFIG_URL = '_url';
+    const CONFIG_FROM = '_from';
+    const CONFIG_TO = '_to';
+    const CONFIG_MORE = '_more';
+    const CONFIG_PARENT_SELECTOR = '_ps';
+
+    // MAX THREADS LIMIT
+    const MAX_THREADS_LIMIT = 5;
+
     //Messages
     class Messager {}
     Messager.ERROR_PARENT_SELECTOR = 'Parrent selector does not exists';
@@ -8,13 +18,6 @@
     Messager.NO_FROM_EP = 'Has not "from" entry point';
     Messager.NO_TO_EP = 'Has not "to" end point';
     Messager.NO_ARG = 'Arguments should be from 1 to 3';
-
-    //Config
-    const CONFIG_URL = '_url';
-    const CONFIG_FROM = '_from';
-    const CONFIG_TO = '_to';
-    const CONFIG_MORE = '_more';
-    const CONFIG_PARENT_SELECTOR = '_ps';
 
     // StringBuilder
     class StringBuilder {
@@ -397,7 +400,15 @@
 
         static get(url) {
             url = ProxyServer.getProxyString(url);
-            return GL.fetch(url).then(r => r.text());
+            if (!SpliterAsyn.charset) {
+                return GL.fetch(url).then(r => r.text());
+            }
+
+            return GL.fetch(url).then(r => r.arrayBuffer()).then(buf => {
+                return new Promise((res, rej) => {
+                    res(TextEncoderDecoder.decode(buf, SpliterAsyn.charset));
+                });
+            });
         }
 
         static getJSON(url) {
@@ -422,7 +433,7 @@
 
         static find(url, selector, attr) {
             return new GL.Promise((res, rej) => {
-                this.getDOM(url).then(df => {
+                SpliterAsyn.getDOM(url).then(df => {
                     let els = df.querySelectorAll(selector);
                     if (!attr) {
                         res(els);
@@ -437,128 +448,146 @@
             });
         }
 
+        static findArr(urlArr, selector, attr) {
+            if (urlArr.length <= MAX_THREADS_LIMIT) {
+
+                return new GL.Promise((res, rej) => {
+                    let pr = [];
+                    let result = [];
+                    urlArr.forEach(url => {
+                        pr.push(this.find(url, selector, attr));
+                    });
+                    GL.Promise.all(pr).then(data => {
+                        data.forEach(d => {
+                            result = result.concat(d);
+                        });
+                        res(result);
+                    });
+                });
+
+            } else {
+
+                return new Promise((res, rej) => {
+                    let stack = [];
+                    let result = [];
+                    let find = this.find;
+                    function doFetch() {
+                        stack.push(find(urlArr.shift(), selector, attr).then(r => {
+                            result = result.concat(r);
+                            if (urlArr.length > 0) {
+                                doFetch();
+                            } else {
+                                GL.Promise.all(stack).then(d => {res(result)});
+                            }
+                        }));
+                    }
+                    for (let i = 0, max = MAX_THREADS_LIMIT; i < max; i += 1) {
+                        doFetch();
+                    }
+                });
+
+            }
+        }
+
         /*
         obj = {
-            ?_parentSelector: 'CSS PARENT SELECTOR',
-            name1: {
-                selector: '<CSS SELECTOR>',
-                attr: 'ELEMENT ATTRIBUTE'
-            },
-            name2: {
-                selector: '<CSS SELECTOR>',
-                attr: 'ELEMENT ATTRIBUTE'
-            },
+            _parentSelector: 'CSS PARENT SELECTOR',
+            name1: '?<CSS SELECTOR> <ELEMENT ATTRIBUTE>',
+            name2: '?<CSS SELECTOR> <ELEMENT ATTRIBUTE>',
             ...
         }
         return [{name1,name2}, {name1,name2},...]
         */
-        static findBatch(url, obj, parentSel) {
+        static findBatch(url, objParam) {
             return new GL.Promise((res, rej) => {
                 let result = [];
-                let ps = obj._parentSelector || obj._ps || parentSel;
+                let ps = objParam._parentSelector || objParam[CONFIG_PARENT_SELECTOR];
+                let obj = Object.assign({}, objParam);
                 delete obj._parentSelector;
-                delete obj._ps;
+                delete obj[CONFIG_PARENT_SELECTOR];
 
                 if (!ps) {
-                    rej({message: 'does not exists parentSelector'});
+                    rej({message: Messager.ERROR_PARENT_SELECTOR});
                 }
 
-                this.getDOM(url).then((df) => {
+                SpliterAsyn.getDOM(url).then((df) => {
                     let parentEls = df.querySelectorAll(ps);
-                    for (let i = 0, len = parentEls.length; i < len; i += 1) {
-                        let newObj = {};
-                        for (let o in obj) {
-                            let typeP = typeof obj[o];
-                            let sel;
-                            let attr;
-                            if (typeP === 'string') {
-                                let arrP = obj[o].split(' ');
-                                attr = arrP.pop();
-                                sel = arrP.join(' ');
-                            } else {
-                                sel = obj[o].selector;
-                                attr = obj[o].attr;
-                            }
-                            let pEl = parentEls[i];
-                            let propEl = sel ? pEl.querySelector(sel) : pEl;
-                            let prop = propEl[attr];
-                            newObj[o] = prop;
-                        }
-                        result.push(newObj);
-                    }
+                    result = Spliter._getFromParent(parentEls, obj);
 
-                    res(result);
-                });
-            });
-        }
-
-        static findArr(urlArr, selector, attr) {
-            return new GL.Promise((res, rej) => {
-                let pr = [];
-                let result = [];
-                urlArr.forEach(url => {
-                    pr.push(this.find(url, selector, attr));
-                });
-                GL.Promise.all(pr).then(data => {
-                    data.forEach(d => {
-                        result = result.concat(d);
-                    });
                     res(result);
                 });
             });
         }
 
         static findArrBatch(urlArr, obj) {
-            return new GL.Promise((res, rej) => {
-                let pr = [];
-                let result = [];
-                let ps = obj._parentSelector || obj._ps;
-                urlArr.forEach(url => {
-                    pr.push(this.findBatch(url, obj, ps));
-                });
-                GL.Promise.all(pr).then(data => {
-                    data.forEach(d => {
-                        result = result.concat(d);
+            if (urlArr.length <= MAX_THREADS_LIMIT) {
+
+                return new GL.Promise((res, rej) => {
+                    let pr = [];
+                    let result = [];
+                    urlArr.forEach(url => {
+                        pr.push(this.findBatch(url, obj));
                     });
-                    res(result);
+                    GL.Promise.all(pr).then(data => {
+                        data.forEach(d => {
+                            result = result.concat(d);
+                        });
+                        res(result);
+                    });
                 });
-            });
+
+            } else {
+
+                return new Promise((res, rej) => {
+                    let stack = [];
+                    let result = [];
+                    let findBatch = this.findBatch;
+                    function doFetch() {
+                        stack.push(findBatch(urlArr.shift(), obj).then(r => {
+                            result = result.concat(r);
+                            if (urlArr.length > 0) {
+                                doFetch();
+                            } else {
+                                GL.Promise.all(stack).then(d => {res(result)});
+                            }
+                        }));
+                    }
+                    for (let i = 0, max = MAX_THREADS_LIMIT; i < max; i += 1) {
+                        doFetch();
+                    }
+                });
+
+            }
         }
 
         // config = {from: int, to: int, ?more: [string]}
-        static findRangeBatch(urlTemplate, config, obj) {
+        static findRange(urlTemplate, config, obj) {
             return new GL.Promise((res, rej) => {
-                let pr = [];
-                let result = [];
+                let urls = [];
                 let start = config.from;
                 let end = config.to;
                 let aditionalArr = config.more;
-                let ps = config.parentSelector || config.ps || obj._parentSelector || obj._ps;
 
                 if ((typeof start === 'number') && (typeof end === 'number')) {
                     for (let i = start; i <= end; i += 1) {
                         let url = StringBuilder.build(urlTemplate, i);
-                        pr.push(this.findBatch(url, obj, ps));
+                        urls.push(url);
                     }
                 }
 
                 if (aditionalArr) {
                     aditionalArr.forEach(i => {
                         let url = StringBuilder.build(urlTemplate, i);
-                        pr.push(this.findBatch(url, obj, ps));
+                        urls.push(url);
                     });
                 }
 
-                GL.Promise.all(pr).then(data => {
-                    data.forEach(d => {
-                        result = result.concat(d);
-                    });
-                    res(result);
-                });
+                this.findArrBatch(urls, obj).then(r => {res(r)});
             });
         }
     }
     SpliterAsyn.parser = new DOMParser();
+    SpliterAsyn.charset = null;
 
     // localStorage
     class Storage {
@@ -587,6 +616,28 @@
 
         static clear() {
             GL.localStorage.clear();
+        }
+    }
+
+    // TextEncoderDecoder
+    class TextEncoderDecoder {
+
+        static encode(txt) {
+            let te = new TextEncoder();
+            let buf = te.encode(txt);
+            return buf;
+        }
+
+        static decode(buf, charset) {
+            let td = new TextDecoder(charset);
+            let txt = td.decode(buf);
+            return txt;
+        }
+
+        static redecode(txt, charset) {
+            let buf = this.encode(txt);
+            let newText = this.decode(buf, charset);
+            return newText;
         }
     }
 
@@ -727,15 +778,21 @@
 
     function clearCache() {
         Cacher.clear();
-    }
+    };
+
+    function setCharset(charset) {
+        SpliterAsyn.charset = charset;
+    };
 
     // MAIN OBJECT
-    const version = '0.4.0';
+    const version = '1.0.0';
     GL.golem = {
         version: version,
         utils: {
             StringBuilder: StringBuilder,
-            UrlBuilder: UrlBuilder
+            UrlBuilder: UrlBuilder,
+            TextEncoderDecoder: TextEncoderDecoder,
+            setCharset: setCharset
         },
         Proxy: ProxyServer,
         Storage: Storage,
